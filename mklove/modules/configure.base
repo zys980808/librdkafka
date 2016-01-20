@@ -903,11 +903,18 @@ function mkl_compile_check {
     mv "$srcfile" "${srcfile}.$ext"
     srcfile="$srcfile.$ext"
     echo "$6" > $srcfile
-    echo "
+    if [[ $MKL_HOST_TYPE == win32 ]]; then
+        echo "
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+int WINAPI WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nShowCmd) { return 0; }
+" >> $srcfile
+    fi
+        echo "
 int main () { return 0; }
 " >> $srcfile
 
-    local cmd="${!4} $cflags $(mkl_mkvar_get CPPFLAGS) -Wall -Werror $5 $srcfile -o ${srcfile}.o $ldf $(mkl_mkvar_get LDFLAGS)";
+    local cmd="${!4} $cflags $(mkl_mkvar_get CPPFLAGS) -Wall -Werror $srcfile -o ${srcfile}.o $5 $ldf $(mkl_mkvar_get LDFLAGS)";
     mkl_dbg "Compile check $1 ($2): $cmd"
 
     local output
@@ -1038,6 +1045,9 @@ function mkl_lib_check {
 
 # Check for library with pkg-config
 # Automatically sets CFLAGS and LIBS from pkg-config information.
+#
+# NOTE: pkg-config is currently disabled for cross-compilation builds
+#
 # Arguments:
 #  [--static=<lib>]  (allows static linking (--enable-static) for the
 #                     library provided, e.g.: --static=-lrdkafka "librdkafka"..)
@@ -1053,6 +1063,10 @@ function mkl_pkg_config_check {
     fi
 
     mkl_check_begin "$1" "$2" "no-cache" "$1 (by pkg-config)" && return $?
+    if [[ -n $MKL_CROSS ]]; then
+        mkl_check_failed "$1" "$2" "$3" "pkg-config disabled for cross-compilations"
+        return 1
+    fi
 
     local cflags=
     local cmd="${PKG_CONFIG} --short-errors --cflags $1"

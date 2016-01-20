@@ -25,7 +25,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-#ifdef _MSC_VER
+#ifdef HOST_WIN32
 #pragma comment(lib, "ws2_32.lib")
 #endif
 
@@ -48,7 +48,7 @@
 #endif
 
 
-#ifdef _MSC_VER
+#ifdef HOST_WIN32
 #define socket_errno WSAGetLastError()
 #else
 #include <sys/socket.h>
@@ -92,7 +92,7 @@ void rd_kafka_transport_close (rd_kafka_transport_t *rktrans) {
 		rd_kafka_buf_destroy(rktrans->rktrans_recv_buf);
 
 	if (rktrans->rktrans_s != -1) {
-#ifndef _MSC_VER
+#ifndef HOST_WIN32
 		close(rktrans->rktrans_s);
 #else
 		closesocket(rktrans->rktrans_s);
@@ -104,7 +104,7 @@ void rd_kafka_transport_close (rd_kafka_transport_t *rktrans) {
 
 
 static const char *socket_strerror(int err) {
-#ifdef _MSC_VER
+#ifdef HOST_WIN32
 	static RD_TLS char buf[256];
 	FormatMessageA(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL,
 		       err, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), (LPSTR)buf, sizeof(buf)-1, NULL);
@@ -124,7 +124,7 @@ static ssize_t
 rd_kafka_transport_socket_sendmsg (rd_kafka_transport_t *rktrans,
 				   const struct msghdr *msg,
 				   char *errstr, size_t errstr_size) {
-#ifndef _MSC_VER
+#ifndef HOST_WIN32
 	ssize_t r;
 
 #ifdef sun
@@ -175,7 +175,7 @@ static ssize_t
 rd_kafka_transport_socket_recvmsg (rd_kafka_transport_t *rktrans,
 				   struct msghdr *msg,
 				   char *errstr, size_t errstr_size) {
-#ifndef _MSC_VER
+#ifndef HOST_WIN32
 	ssize_t r;
 #ifdef sun
 	/* SunOS doesn't seem to set errno when recvmsg() fails
@@ -1064,7 +1064,11 @@ rd_kafka_transport_t *rd_kafka_transport_connect (rd_kafka_broker_t *rkb,
 						  int errstr_size) {
 	rd_kafka_transport_t *rktrans;
 	int s = -1;
+#ifdef HOST_WIN32
+        u_long on = 1;
+#else
 	int on = 1;
+#endif
 
 
         rkb->rkb_addr_last = sinx;
@@ -1104,7 +1108,7 @@ rd_kafka_transport_t *rd_kafka_transport_connect (rd_kafka_broker_t *rkb,
 
 
 	/* Set the socket to non-blocking */
-#ifdef _MSC_VER
+#ifdef HOST_WIN32
 	if (ioctlsocket(s, FIONBIO, &on) == SOCKET_ERROR) {
 		rd_snprintf(errstr, errstr_size,
 			    "Failed to set socket non-blocking: %s",
@@ -1135,7 +1139,7 @@ rd_kafka_transport_t *rd_kafka_transport_connect (rd_kafka_broker_t *rkb,
 	if (connect(s, (struct sockaddr *)sinx,
 		    RD_SOCKADDR_INX_LEN(sinx)) == SOCKET_ERROR &&
 	    (socket_errno != EINPROGRESS
-#ifdef _MSC_VER
+#ifdef HOST_WIN32
 		&& socket_errno != WSAEWOULDBLOCK
 #endif
 		)) {
@@ -1165,7 +1169,7 @@ rd_kafka_transport_t *rd_kafka_transport_connect (rd_kafka_broker_t *rkb,
 
  err:
 	if (s != -1) {
-#ifndef _MSC_VER
+#ifndef HOST_WIN32
 		close(s);
 #else
 		closesocket(s);
@@ -1186,7 +1190,7 @@ void rd_kafka_transport_poll_clear(rd_kafka_transport_t *rktrans, int event) {
 
 
 int rd_kafka_transport_poll(rd_kafka_transport_t *rktrans, int tmout) {
-#ifndef _MSC_VER
+#ifndef HOST_WIN32
 	int r;
 
 	r = poll(&rktrans->rktrans_pfd, 1, tmout);
@@ -1218,7 +1222,7 @@ int rd_kafka_transport_poll(rd_kafka_transport_t *rktrans, int tmout) {
  * on exit.
  */
 void rd_kafka_transport_term (void) {
-#ifdef _MSC_VER
+#ifdef HOST_WIN32
 	(void)WSACleanup(); /* FIXME: dangerous */
 #endif
 
@@ -1230,7 +1234,7 @@ void rd_kafka_transport_term (void) {
 #endif
  
 void rd_kafka_transport_init(void) {
-#ifdef _MSC_VER
+#ifdef HOST_WIN32
 	WSADATA d;
 	(void)WSAStartup(MAKEWORD(2, 2), &d);
 #endif

@@ -42,7 +42,9 @@
 /**
  * Types
  */
+#ifdef _MSC_VER
 typedef SSIZE_T ssize_t;
+#endif
 typedef int socklen_t;
 
 struct iovec {
@@ -66,21 +68,6 @@ struct msghdr {
 
 
 
-/**
-* Annotations, attributes, optimizers
-*/
-#ifndef likely
-#define likely(x)   x
-#endif
-#ifndef unlikely
-#define unlikely(x) x
-#endif
-
-#define RD_UNUSED
-#define RD_WARN_UNUSED_RESULT
-#define RD_NORETURN __declspec(noreturn)
-#define RD_IS_CONSTANT(p)  (0)
-#define RD_TLS __declspec(thread)
 
 
 /**
@@ -93,11 +80,23 @@ struct msghdr {
  * Strings, formatting, printf, ..
  */
 
+
+#if __USE_MINGW_ANSI_STDIO > 0
+
+/* size_t and ssize_t format strings */
+#define PRIusz  "zu"
+#define PRIdsz  "zd"
+
+
+#define rd_snprintf(...)  __mingw_snprintf(__VA_ARGS__)
+#define rd_vsnprintf(...) __mingw_vsnprintf(__VA_ARGS__)
+
+#else
+
 /* size_t and ssize_t format strings */
 #define PRIusz  "Iu"
 #define PRIdsz  "Id"
 
-#define RD_FORMAT(...)
 
 static RD_UNUSED __inline
 int rd_vsnprintf (char *str, size_t size, const char *format, va_list ap) {
@@ -122,6 +121,7 @@ int rd_snprintf (char *str, size_t size, const char *format, ...) {
 
         return cnt;
 }
+#endif
 
 
 #define rd_strcasecmp(A,B) _stricmp(A,B)
@@ -158,7 +158,3 @@ static __inline RD_UNUSED const char *rd_strerror(int err) {
 
 #define rd_assert(EXPR)  assert(EXPR)
 
-/**
- * Empty struct initializer
- */
-#define RD_ZERO_INIT  {0}

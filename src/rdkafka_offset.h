@@ -51,6 +51,7 @@ void rd_kafka_offset_store0 (rd_kafka_toppar_t *rktp, int64_t offset,
 		rd_kafka_toppar_unlock(rktp);
 }
 
+RD_EXPORT
 rd_kafka_resp_err_t rd_kafka_offset_store (rd_kafka_topic_t *rkt,
 					   int32_t partition, int64_t offset);
 

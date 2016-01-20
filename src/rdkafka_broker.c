@@ -29,7 +29,7 @@
 
 #define __need_IOV_MAX
 
-#ifndef _MSC_VER
+#ifndef HOST_WIN32
 #define _GNU_SOURCE
 #ifndef _AIX    /* AIX defines this and the value needs to be set correctly */
 #define _XOPEN_SOURCE
@@ -42,7 +42,6 @@
 #include <string.h>
 #include <ctype.h>
 
-#include "rd.h"
 #include "rdkafka_int.h"
 #include "rdkafka_msg.h"
 #include "rdkafka_topic.h"
@@ -61,6 +60,11 @@
 #include "rdgz.h"
 #include "snappy.h"
 #include "rdendian.h"
+
+#ifdef HOST_WIN32
+#define WIN32_LEAN_AND_MEAN
+#include <ws2tcpip.h>
+#endif
 
 
 const char *rd_kafka_broker_state_names[] = {
@@ -86,7 +90,7 @@ const char *rd_kafka_secproto_names[] = {
 static void iov_print (rd_kafka_t *rk,
 		       const char *what, int iov_idx, const struct iovec *iov,
 		       int hexdump) {
-	printf("%s:  iov #%i: %"PRIdsz"\n", what, iov_idx,
+	printf("%s:  iov #%i: %"PRIusz"\n", what, iov_idx,
 	       (size_t)iov->iov_len);
 	if (hexdump)
 		rd_hexdump(stdout, what, iov->iov_base, iov->iov_len);
@@ -876,8 +880,9 @@ static int rd_kafka_req_response (rd_kafka_broker_t *rkb,
                 return -1;
 	}
 
+        #define PRIusz "Iu"
 	rd_rkb_dbg(rkb, PROTOCOL, "RECV",
-		   "Received %sResponse (v%hd, %"PRIdsz" bytes, CorrId %"PRId32
+		   "Received %sResponse (v%hd, %"PRIusz" bytes, CorrId %"PRId32
 		   ", rtt %.2fms)",
 		   rd_kafka_ApiKey2str(req->rkbuf_reqhdr.ApiKey),
                    req->rkbuf_reqhdr.ApiVersion,
@@ -1090,7 +1095,9 @@ int rd_kafka_socket_cb_linux (int domain, int type, int protocol,
 int rd_kafka_socket_cb_generic (int domain, int type, int protocol,
                                 void *opaque) {
         int s;
+#ifdef FD_CLOEXEC
         int on = 1;
+#endif
         s = socket(domain, type, protocol);
         if (s == -1)
                 return -1;
@@ -1508,10 +1515,10 @@ static int rd_kafka_compress_MessageSet_buf (rd_kafka_broker_t *rkb,
 					     int iov_firstmsg, size_t of_firstmsg,
 						 size_t of_init_firstmsg,
 					     int32_t *MessageSetSizep) {
-	int32_t MessageSetSize = *MessageSetSizep;
+	RD_UNUSED int32_t MessageSetSize = *MessageSetSizep;
 	size_t coutlen = 0;
 	int    outlen;
-	int r;
+	RD_UNUSED int r;
 #if WITH_SNAPPY
 	int    siovlen = 1;
 	struct snappy_env senv;
@@ -3440,7 +3447,7 @@ rd_kafka_broker_t *rd_kafka_broker_add (rd_kafka_t *rk,
 					int32_t nodeid) {
 	rd_kafka_broker_t *rkb;
 	int err;
-#ifndef _MSC_VER
+#ifndef HOST_WIN32
 	sigset_t newset, oldset;
 #endif
 
@@ -3482,7 +3489,7 @@ rd_kafka_broker_t *rd_kafka_broker_add (rd_kafka_t *rk,
 	else /* disabled */
 		rkb->rkb_ts_metadata_poll = UINT64_MAX;
 
-#ifndef _MSC_VER
+#ifndef HOST_WIN32
         /* Block all signals in newly created thread.
          * To avoid race condition we block all signals in the calling
          * thread, which the new thread will inherit its sigmask from,
@@ -3517,7 +3524,7 @@ rd_kafka_broker_t *rd_kafka_broker_add (rd_kafka_t *rk,
 
 		rd_free(rkb);
 
-#ifndef _MSC_VER
+#ifndef HOST_WIN32
 		/* Restore sigmask of caller */
 		pthread_sigmask(SIG_SETMASK, &oldset, NULL);
 #endif
@@ -3541,7 +3548,7 @@ rd_kafka_broker_t *rd_kafka_broker_add (rd_kafka_t *rk,
 
 	rd_kafka_broker_unlock(rkb);
 
-#ifndef _MSC_VER
+#ifndef HOST_WIN32
 	/* Restore sigmask of caller */
 	pthread_sigmask(SIG_SETMASK, &oldset, NULL);
 #endif
@@ -3748,6 +3755,7 @@ int rd_kafka_brokers_add0 (rd_kafka_t *rk, const char *brokerlist) {
 }
 
 
+RD_EXPORT
 int rd_kafka_brokers_add (rd_kafka_t *rk, const char *brokerlist) {
         return rd_kafka_brokers_add0(rk, brokerlist);
 }

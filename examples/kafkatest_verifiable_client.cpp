@@ -161,6 +161,8 @@ static std::string now () {
 
 static time_t watchdog_last_kick;
 static const int watchdog_timeout = 10;
+
+#ifdef SIGALRM
 static void sigwatchdog (int sig) {
   time_t t = time(NULL);
   if (watchdog_last_kick + watchdog_timeout <= t) {
@@ -169,12 +171,16 @@ static void sigwatchdog (int sig) {
     abort();
   }
 }
+#endif
+
 
 static void watchdog_kick () {
   watchdog_last_kick = time(NULL);
-  
+
   /* Safe guard against hangs-on-exit */
+#ifndef _WIN32
   alarm(watchdog_timeout);
+#endif
 }
 
 
@@ -571,11 +577,13 @@ int main (int argc, char **argv) {
   RdKafka::Conf *conf = RdKafka::Conf::create(RdKafka::Conf::CONF_GLOBAL);
   RdKafka::Conf *tconf = RdKafka::Conf::create(RdKafka::Conf::CONF_TOPIC);
 
+#ifndef _WIN32
   {
     char hostname[128];
     gethostname(hostname, sizeof(hostname)-1);
     conf->set("client.id", std::string("rdkafka@") + hostname, errstr);
   }
+#endif
 
   conf->set("debug", "cgrp,topic", errstr);
 
@@ -684,7 +692,9 @@ int main (int argc, char **argv) {
 
   signal(SIGINT, sigterm);
   signal(SIGTERM, sigterm);
+#ifdef SIGALRM
   signal(SIGALRM,  sigwatchdog);
+#endif
 
 
   if (mode == "P") {

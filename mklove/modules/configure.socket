@@ -12,9 +12,21 @@ void foo (void) {
    int s = socket(0, 0, 0);
    close(s);
 }"
-    if ! mkl_compile_check socket "" cont CC "" "$src"; then
-	if mkl_compile_check --ldflags="-lsocket -lnsl" socket_nsl "" fail CC "" "$src"; then
-	    mkl_mkvar_append socket_nsl LIBS "-lsocket -lnsl"
-	fi
+
+        local winsrc="
+#define WIN32_MEAN_AND_LEAN
+#include <winsock2.h>
+void foo (void) {
+   (void)WSAStartup(0, NULL);
+}"
+
+    if mkl_compile_check socket "" cont CC "" "$src"; then
+        true
+    elif mkl_compile_check --ldflags="-lsocket -lnsl" socket_nsl "" cont CC "" "$src"; then
+        # Solaris requires -lnsl
+	mkl_mkvar_append socket_nsl LIBS "-lsocket -lnsl"
+    elif [[ $MKL_HOST_TYPE == win32 ]] &&
+             mkl_lib_check --static=-lws2_32 winsock "" fail CC "-lws2_32" "$winsrc"; then
+        true
     fi
 }

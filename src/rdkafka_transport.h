@@ -28,7 +28,7 @@
 
 #pragma once
 
-#ifndef _MSC_VER
+#ifndef HOST_WIN32
 #include <poll.h>
 #endif
 

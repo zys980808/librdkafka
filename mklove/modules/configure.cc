@@ -12,12 +12,12 @@ function checks {
     # C compiler
     mkl_meta_set "ccenv" "name" "C compiler from CC env"
     if ! mkl_command_check "ccenv" "WITH_CC" cont "$CC --version"; then
-        if mkl_command_check "gcc" "WITH_GCC" cont "gcc --version"; then
-            CC=gcc
-        elif mkl_command_check "clang" "WITH_CLANG" cont "clang --version"; then
-            CC=clang
-        elif mkl_command_check "cc" "WITH_CC" fail "cc --version"; then
-            CC=cc
+        if mkl_command_check "gcc" "WITH_GCC" cont "${MKL_TOOL_PREFIX}gcc --version"; then
+            CC=${MKL_TOOL_PREFIX}gcc
+        elif mkl_command_check "clang" "WITH_CLANG" cont "${MKL_TOOL_PREFIX}clang --version"; then
+            CC=${MKL_TOOL_PREFIX}clang
+        elif mkl_command_check "cc" "WITH_CC" fail "${MKL_TOOL_PREFIX}cc --version"; then
+            CC=${MKL_TOOL_PREFIX}cc
         fi
     fi
     export CC="${CC}"
@@ -30,12 +30,12 @@ function checks {
             mkl_meta_set "gxx" "name" "C++ compiler (g++)"
             mkl_meta_set "clangxx" "name" "C++ compiler (clang++)"
             mkl_meta_set "cxx" "name" "C++ compiler (c++)"
-            if mkl_command_check "gxx" "WITH_GXX" cont "g++ --version"; then
-                CXX=g++
-            elif mkl_command_check "clangxx" "WITH_CLANGXX" cont "clang++ --version"; then
-                CXX=clang++
-            elif mkl_command_check "cxx" "WITH_CXX" fail "c++ --version"; then
-                CXX=c++
+            if mkl_command_check "gxx" "WITH_GXX" cont "${MKL_TOOL_PREFIX}g++ --version"; then
+                CXX=${MKL_TOOL_PREFIX}g++
+            elif mkl_command_check "clangxx" "WITH_CLANGXX" cont "${MKL_TOOL_PREFIX}clang++ --version"; then
+                CXX=${MKL_TOOL_PREFIX}clang++
+            elif mkl_command_check "cxx" "WITH_CXX" fail "${MKL_TOOL_PREFIX}c++ --version"; then
+                CXX=${MKL_TOOL_PREFIX}c++
             fi
         fi
         export CXX="${CXX}"
@@ -62,7 +62,7 @@ function checks {
         t=${t#*:}
 	local tval="${!tenv}"
 
-        [[ -z $tval ]] && tval="$t"
+        [[ -z $tval ]] && tval="${MKL_TOOL_PREFIX}$t"
 
         if mkl_prog_check "$t" "" disable "$tval" ; then
             if [[ $tval != ${!tenv} ]]; then

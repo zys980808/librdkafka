@@ -28,12 +28,17 @@
 
 #pragma once
 
+#if WITH_CONFIG_H
+#include "../config.h"
+#endif
 
-#ifndef _MSC_VER
+#ifndef HOST_WIN32
 #define _GNU_SOURCE  /* for strndup() */
 #include <syslog.h>
 #else
+#ifdef _MSC_VER
 typedef int mode_t;
+#endif
 #endif
 #include <fcntl.h>
 

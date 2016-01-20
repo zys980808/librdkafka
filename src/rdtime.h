@@ -28,6 +28,11 @@
 
 #pragma once
 
+#ifdef HOST_WIN32
+#ifdef __MINGW32__
+#include <sysinfoapi.h>
+#endif
+#endif
 
 #ifndef TIMEVAL_TO_TIMESPEC
 #define TIMEVAL_TO_TIMESPEC(tv,ts) do {		\
@@ -63,7 +68,7 @@ static __inline rd_ts_t rd_clock (void) {
 	struct timeval tv;
 	gettimeofday(&tv, NULL);
 	return ((rd_ts_t)tv.tv_sec * 1000000LLU) + (rd_ts_t)tv.tv_usec;
-#elif defined(_MSC_VER)
+#elif defined(HOST_WIN32)
 	return (rd_ts_t)GetTickCount64() * 1000LLU;
 #else
 	struct timespec ts;
@@ -82,7 +87,7 @@ static __inline const char *rd_ctime (const time_t *t) RD_UNUSED;
 static __inline const char *rd_ctime (const time_t *t) {
 	static RD_TLS char ret[27];
 
-#ifndef _MSC_VER
+#ifndef HOST_WIN32
 	ctime_r(t, ret);
 #else
 	ctime_s(ret, sizeof(ret), t);

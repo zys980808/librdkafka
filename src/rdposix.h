@@ -41,21 +41,6 @@
 */
 
 
-/**
- * Annotations, attributes, optimizers
- */
-#ifndef likely
-#define likely(x)   __builtin_expect((x),1)
-#endif
-#ifndef unlikely
-#define unlikely(x) __builtin_expect((x),0)
-#endif
-
-#define RD_UNUSED   __attribute__((unused))
-#define RD_WARN_UNUSED_RESULT __attribute__((warn_unused_result))
-#define RD_NORETURN __attribute__((noreturn))
-#define RD_IS_CONSTANT(p)  __builtin_constant_p((p))
-#define RD_TLS      __thread
 
 /**
 * Allocation
@@ -76,7 +61,6 @@
 #define PRIusz  "zu"
 #define PRIdsz  "zd"
 
-#define RD_FORMAT(...) __attribute__((format (__VA_ARGS__)))
 #define rd_snprintf(...)  snprintf(__VA_ARGS__)
 #define rd_vsnprintf(...) vsnprintf(__VA_ARGS__)
 
@@ -114,7 +98,3 @@ void rd_usleep (int usec, rd_atomic32_t *terminate) {
 
 #define rd_assert(EXPR)  assert(EXPR)
 
-/**
- * Empty struct initializer
- */
-#define RD_ZERO_INIT  {}

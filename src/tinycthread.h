@@ -479,25 +479,44 @@ int tss_set(tss_t key, void *val);
 
 
 /**
-* FIXME: description */
+ * Read-write locks
+ */
 #if defined(_TTHREAD_WIN32_)
 typedef struct rwlock_t {
 	SRWLOCK  lock;
+#ifdef __MINGW32__
+  volatile long int rcnt;
+  volatile long int wcnt;
+#else
 	int       rcnt;
-	int       wcnt;
+  int       wcnt;
+#endif
 } rwlock_t;
-#define rwlock_init(rwl)    do { (rwl)->rcnt = (rwl)->wcnt = 0; InitializeSRWLock(&(rwl)->lock); } while (0)
+#define rwlock_init(rwl)    do {                                        \
+                (rwl)->rcnt = (rwl)->wcnt = 0;                          \
+                InitializeSRWLock(&(rwl)->lock);                        \
+        } while (0)
 #define rwlock_destroy(rwl)
-#define rwlock_rdlock(rwl)   do { if (0) printf("Thr %i: at %i:   RDLOCK %p   %s (%i, %i)\n", GetCurrentThreadId(), __LINE__, rwl, __FUNCTION__, (rwl)->rcnt, (rwl)->wcnt); assert((rwl)->rcnt >= 0 && (rwl)->wcnt >= 0); AcquireSRWLockShared(&(rwl)->lock); InterlockedIncrement(&(rwl)->rcnt); } while (0)
-#define rwlock_wrlock(rwl)   do { if (0) printf("Thr %i: at %i:   WRLOCK %p   %s (%i, %i)\n", GetCurrentThreadId(), __LINE__, rwl, __FUNCTION__, (rwl)->rcnt, (rwl)->wcnt); assert((rwl)->rcnt >= 0 && (rwl)->wcnt >= 0); AcquireSRWLockExclusive(&(rwl)->lock); InterlockedIncrement(&(rwl)->wcnt); } while (0)
-#define rwlock_rdunlock(rwl) do { if (0) printf("Thr %i: at %i: RDUNLOCK %p   %s (%i, %i)\n", GetCurrentThreadId(), __LINE__, rwl, __FUNCTION__, (rwl)->rcnt, (rwl)->wcnt); assert((rwl)->rcnt > 0 && (rwl)->wcnt >= 0); ReleaseSRWLockShared(&(rwl)->lock); InterlockedDecrement(&(rwl)->rcnt); } while (0)  
-#define rwlock_wrunlock(rwl) do { if (0) printf("Thr %i: at %i: RWUNLOCK %p   %s (%i, %i)\n", GetCurrentThreadId(), __LINE__, rwl, __FUNCTION__, (rwl)->rcnt, (rwl)->wcnt); assert((rwl)->rcnt >= 0 && (rwl)->wcnt > 0); ReleaseSRWLockExclusive(&(rwl)->lock); InterlockedDecrement(&(rwl)->wcnt); } while (0)  
-
-#define rwlock_rdlock_d(rwl)   do { if (1) printf("Thr %i: at %i:   RDLOCK %p   %s (%i, %i)\n", GetCurrentThreadId(), __LINE__, rwl, __FUNCTION__, (rwl)->rcnt, (rwl)->wcnt); assert((rwl)->rcnt >= 0 && (rwl)->wcnt >= 0); AcquireSRWLockShared(&(rwl)->lock); InterlockedIncrement(&(rwl)->rcnt); } while (0)
-#define rwlock_wrlock_d(rwl)   do { if (1) printf("Thr %i: at %i:   WRLOCK %p   %s (%i, %i)\n", GetCurrentThreadId(), __LINE__, rwl, __FUNCTION__, (rwl)->rcnt, (rwl)->wcnt); assert((rwl)->rcnt >= 0 && (rwl)->wcnt >= 0); AcquireSRWLockExclusive(&(rwl)->lock); InterlockedIncrement(&(rwl)->wcnt); } while (0)
-#define rwlock_rdunlock_d(rwl) do { if (1) printf("Thr %i: at %i: RDUNLOCK %p   %s (%i, %i)\n", GetCurrentThreadId(), __LINE__, rwl, __FUNCTION__, (rwl)->rcnt, (rwl)->wcnt); assert((rwl)->rcnt > 0 && (rwl)->wcnt >= 0); ReleaseSRWLockShared(&(rwl)->lock); InterlockedDecrement(&(rwl)->rcnt); } while (0)  
-#define rwlock_wrunlock_d(rwl) do { if (1) printf("Thr %i: at %i: RWUNLOCK %p   %s (%i, %i)\n", GetCurrentThreadId(), __LINE__, rwl, __FUNCTION__, (rwl)->rcnt, (rwl)->wcnt); assert((rwl)->rcnt >= 0 && (rwl)->wcnt > 0); ReleaseSRWLockExclusive(&(rwl)->lock); InterlockedDecrement(&(rwl)->wcnt); } while (0)  
-
+#define rwlock_rdlock(rwl)   do {                                 \
+                rd_dassert((rwl)->rcnt >= 0 && (rwl)->wcnt >= 0); \
+                AcquireSRWLockShared(&(rwl)->lock);               \
+                InterlockedIncrement(&(rwl)->rcnt);               \
+        } while (0)
+#define rwlock_wrlock(rwl)   do {                                 \
+                rd_dassert((rwl)->rcnt >= 0 && (rwl)->wcnt >= 0); \
+                AcquireSRWLockExclusive(&(rwl)->lock);            \
+                InterlockedIncrement(&(rwl)->wcnt);               \
+        } while (0)
+#define rwlock_rdunlock(rwl) do {                                       \
+                assert((rwl)->rcnt > 0 && (rwl)->wcnt >= 0);            \
+                ReleaseSRWLockShared(&(rwl)->lock);                     \
+                InterlockedDecrement(&(rwl)->rcnt);                     \
+        } while (0)
+#define rwlock_wrunlock(rwl) do {                            \
+                assert((rwl)->rcnt >= 0 && (rwl)->wcnt > 0); \
+                ReleaseSRWLockExclusive(&(rwl)->lock);       \
+                InterlockedDecrement(&(rwl)->wcnt);          \
+        } while (0)
 
 #else
 typedef pthread_rwlock_t rwlock_t;

@@ -54,22 +54,23 @@ extern "C" {
 #endif
 #endif
 
-#ifdef _MSC_VER
+#if defined(_MSC_VER)
 #include <basetsd.h>
 typedef SSIZE_T ssize_t;
 #define RD_UNUSED
 #define RD_DEPRECATED
+#else
+#define RD_UNUSED __attribute__((unused))
+#define RD_DEPRECATED __attribute__((deprecated))
+#endif
+
+#if defined(_MSC_VER) || defined(__MINGW32__)
 #undef RD_EXPORT
 #ifdef LIBRDKAFKA_EXPORTS
 #define RD_EXPORT __declspec(dllexport)
 #else
 #define RD_EXPORT __declspec(dllimport)
 #endif
-
-#else
-#define RD_UNUSED __attribute__((unused))
-#define RD_EXPORT
-#define RD_DEPRECATED __attribute__((deprecated))
 #endif
 /* @endcond */
 
@@ -867,7 +868,7 @@ void rd_kafka_conf_set_socket_cb(rd_kafka_conf_t *conf,
                                                     void *opaque));
 
 
-#ifndef _MSC_VER
+#ifndef HOST_WIN32
 /**
  * @brief Set open callback.
  *

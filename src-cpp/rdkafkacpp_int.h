@@ -28,6 +28,10 @@
 
 #pragma once
 
+#if WITH_CONFIG_H
+#include "../config.h"
+#endif
+
 #include <string>
 #include <iostream>
 #include <cstring>

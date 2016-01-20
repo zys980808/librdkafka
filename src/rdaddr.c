@@ -31,8 +31,8 @@
 #include "rdaddr.h"
 #include "rdrand.h"
 
-#ifdef _MSC_VER
-#include <WS2tcpip.h>
+#ifdef HOST_WIN32
+#include <ws2tcpip.h>
 #endif
 
 const char *rd_sockaddr2str (const void *addr, int flags) {
@@ -171,7 +171,7 @@ rd_sockaddr_list_t *rd_getaddrinfo (const char *nodesvc, const char *defsvc,
 #endif
 			*errstr = rd_strerror(errno);
 		else {
-#ifdef _MSC_VER
+#ifdef HOST_WIN32
 			*errstr = gai_strerrorA(r);
 #else
 			*errstr = gai_strerror(r);

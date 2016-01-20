@@ -1234,7 +1234,7 @@ void rd_kafka_conf_set_socket_cb (rd_kafka_conf_t *conf,
 }
 
 
-#ifndef _MSC_VER
+#ifndef HOST_WIN32
 void rd_kafka_conf_set_open_cb (rd_kafka_conf_t *conf,
                                 int (*open_cb) (const char *pathname,
                                                 int flags, mode_t mode,

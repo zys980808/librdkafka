@@ -28,13 +28,13 @@
 
 #pragma once
 
-#ifndef _MSC_VER
+#ifndef HOST_WIN32
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <netdb.h>
 #else
 #define WIN32_MEAN_AND_LEAN
-#include <WinSock2.h>
+#include <winsock2.h>
 #include <ws2ipdef.h>
 #endif
 
@@ -171,8 +171,7 @@ void rd_sockaddr_list_destroy (rd_sockaddr_list_t *rsal);
 /**
  * Returns the human readable name of a socket family.
  */
-static const char *rd_family2str (int af) RD_UNUSED;
-static const char *rd_family2str (int af) {
+static RD_UNUSED const char *rd_family2str (int af) {
 	switch(af){
 		case AF_INET:
 			return "inet";

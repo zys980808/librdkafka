@@ -36,6 +36,27 @@ mkl_toggle_option "Feature" ENABLE_SASL "--enable-sasl" "Enable SASL support" "y
 
 function checks {
 
+    case "$MKL_HOST_TYPE" in
+        win32)
+            mkl_allvar_set cross HOST_WIN32 y
+            if [[ $MKL_HOST == *mingw* ]]; then
+                mkl_mkvar_append CPPFLAGS CPPFLAGS "-DLIBRDKAFKA_EXPORTS=1 -D_WIN32_WINNT=0x601 -D__USE_MINGW_ANSI_STDIO=0"
+            fi
+            ;;
+
+        Linux)
+            mkl_allvar_set cross HOST_LINUX y
+            ;;
+
+        osx)
+            mkl_allvar_set cross HOST_OSX y
+            ;;
+
+        SunOS)
+            mkl_allvar_set cross HOST_SUNOS y
+            ;;
+    esac
+
     # required libs
     mkl_lib_check "libpthread" "" fail CC "-lpthread"
 
@@ -56,17 +77,20 @@ function checks {
     fi
 
     # Snappy is currently broken on MSVC Win32, enable for everything else.
-    # (MSVC Win32 does not use configure)
-    mkl_allvar_set WITH_SNAPPY WITH_SNAPPY y
+    if [[ $HOST_WIN32 != y ]]; then
+        mkl_allvar_set WITH_SNAPPY WITH_SNAPPY y
+    fi
 
-    # -lrt is needed on linux for clock_gettime: link it if it exists.
-    mkl_lib_check "librt" "" cont CC "-lrt"
+    if [[ $HOST_LINUX == y ]]; then
+       # -lrt is needed on linux for clock_gettime: link it if it exists.
+       mkl_lib_check "librt" "" cont CC "-lrt"
+    fi
 
     # Older g++ (<=4.1?) gives invalid warnings for the C++ code.
     mkl_mkvar_append CXXFLAGS CXXFLAGS "-Wno-non-virtual-dtor"
 
     # Required on SunOS
-    if [[ $MKL_DISTRO == "SunOS" ]]; then
+    if [[ $HOST_SUNOS ]]; then
 	mkl_mkvar_append CPPFLAGS CPPFLAGS "-D_POSIX_PTHREAD_SEMANTICS -D_REENTRANT -D__EXTENSIONS__"
     fi
 
@@ -103,5 +127,8 @@ int main (void) {
 	mkl_compile_check valgrind WITH_VALGRIND disable CC "" \
 			  "#include <valgrind/memcheck.h>"
     fi
+
+    # Use config.h (rather than a manually crafted win32_config.h)
+    mkl_mkvar_append CPPFLAGS CPPFLAGS "-DWITH_CONFIG_H=1"
 }
 

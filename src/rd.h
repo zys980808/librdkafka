@@ -30,7 +30,7 @@
 
 #pragma once
 
-#ifndef _MSC_VER
+#ifndef HOST_WIN32
 #define _GNU_SOURCE  /* for strndup() */
 #define __need_IOV_MAX
 #ifndef _POSIX_C_SOURCE
@@ -49,7 +49,7 @@
 #include "tinycthread.h"
 #include "rdsysqueue.h"
 
-#ifdef _MSC_VER
+#if _MSC_VER
 /* Visual Studio */
 #include "win32_config.h"
 #else
@@ -57,7 +57,77 @@
 #include "../config.h" /* mklove output */
 #endif
 
-#ifdef _MSC_VER
+
+#if defined(__GNUC__) || defined(__clang__)
+/**
+ * GCC or clang
+ */
+
+/**
+ * Annotations, attributes, optimizers
+ */
+#ifndef likely
+#define likely(x)   __builtin_expect((x),1)
+#endif
+#ifndef unlikely
+#define unlikely(x) __builtin_expect((x),0)
+#endif
+
+#ifndef RD_UNUSED
+#define RD_UNUSED   __attribute__((unused))
+#endif
+#define RD_WARN_UNUSED_RESULT __attribute__((warn_unused_result))
+#define RD_NORETURN __attribute__((noreturn))
+#define RD_IS_CONSTANT(p)  __builtin_constant_p((p))
+#define RD_TLS      __thread
+
+#if defined(__MINGW32__) && (__USE_MINGW_ANSI_STDIO == 0)
+#define RD_FORMAT(...) __attribute__((__MINGW_PRINTF_FORMAT (__VA_ARGS__)))
+#else
+#define RD_FORMAT(...) __attribute__((format (__VA_ARGS__)))
+#endif
+
+
+/**
+ * Empty struct initializer
+ */
+#define RD_ZERO_INIT  {}
+
+
+#elif defined(_MSC_VER)
+/**
+ * MS Visual Studio
+ */
+
+/**
+* Annotations, attributes, optimizers
+*/
+#ifndef likely
+#define likely(x)   x
+#endif
+#ifndef unlikely
+#define unlikely(x) x
+#endif
+
+#ifndef RD_UNUSED
+#define RD_UNUSED
+#endif
+#define RD_WARN_UNUSED_RESULT
+#define RD_NORETURN __declspec(noreturn)
+#define RD_IS_CONSTANT(p)  (0)
+#define RD_TLS __declspec(thread)
+
+#define RD_FORMAT(...)
+
+/**
+ * Empty struct initializer
+ */
+#define RD_ZERO_INIT  {0}
+
+#endif
+
+
+#ifdef HOST_WIN32
 /* Win32/Visual Studio */
 #include "rdwin32.h"
 
@@ -98,7 +168,7 @@ static __inline RD_UNUSED void rd_free(void *ptr) {
 }
 
 static __inline RD_UNUSED char *rd_strdup(const char *s) {
-#ifndef _MSC_VER
+#ifndef HOST_WIN32
 	char *n = strdup(s);
 #else
 	char *n = _strdup(s);
@@ -143,7 +213,7 @@ static __inline RD_UNUSED char *rd_strndup(const char *s, size_t len) {
 #ifdef __APPLE__
 /* Some versions of MacOSX dont have IOV_MAX */
 #define IOV_MAX 1024
-#elif defined(_MSC_VER)
+#elif defined(HOST_WIN32)
 /* There is no IOV_MAX on MSVC but it is used internally in librdkafka */
 #define IOV_MAX 1024
 #else

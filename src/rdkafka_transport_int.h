@@ -64,8 +64,8 @@ struct rd_kafka_transport_s {
 #endif
 
 	rd_kafka_buf_t *rktrans_recv_buf;  /* Used with framed_recvmsg */
-	
-#ifndef _MSC_VER
+
+#ifndef HOST_WIN32
 	struct pollfd rktrans_pfd;
 #else
 	WSAPOLLFD rktrans_pfd;

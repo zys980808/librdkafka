@@ -1,27 +1,40 @@
 #!/bin/bash
 #
-# Host OS support
+# Host OS support (host to run program on)
 # Sets:
-#  HOST
-#  BUILD
-#  TARGET
-
-# FIXME: No need for this right now
-#mkl_require host_linux
-#mkl_require host_osx
-#mkl_require host_cygwin
-
-#mkl_option "Cross-compilation" "mk:HOST_OS" "--host-os=osname" "Host OS (linux,osx,cygwin,..)" "auto"
-
+#  MKL_DISTRO
+#  MKL_HOST
+#  MKL_HOST_TYPE
+#  MKL_TOOL_PREFIX
 
 # autoconf compatibility - does nothing at this point
-mkl_option "Cross-compilation" "mk:HOST" "--host=HOST" "Configure to build programs to run on HOST (no-op)"
-mkl_option "Cross-compilation" "mk:BUILD" "--build=BUILD" "Configure for building on BUILD (no-op)"
+mkl_option "Cross-compilation" "mk:MKL_HOST" "--host=HOST" "Configure to build programs to run on HOST"
+mkl_option "Cross-compilation" "mk:MKL_BUILD" "--build=BUILD" "Configure for building on BUILD (no-op)"
 mkl_option "Cross-compilation" "mk:TARGET" "--target=TARGET" "Configure for building cross-toolkits for platform TARGET (no-op)"
 
 function checks {
+
+
+    # Cross compilation host (to run program on)
+    mkl_check_begin "cross" "" "no-cache" "host type"
+    if [[ $MKL_HOST == *mingw[36][24]* ]]; then
+        mkl_mkvar_set "cross" MKL_HOST_TYPE win32
+        #mkl_mkvar_append "cross" CPPFLAGS "-Wl,--export-all-symbols -Wl,--allow-multiple-definition -Wl,--enable-auto-import -Wl,--whole-archive"
+        mkl_mkvar_append "cross" CPPFLAGS "-Wl,--enable-auto-import"
+    fi
+
+    if [[ -n $MKL_HOST ]]; then
+        mkl_mkvar_set "cross" MKL_CROSS y
+        mkl_mkvar_set "cross" MKL_TOOL_PREFIX "$MKL_HOST"-
+        mkl_check_done "cross" "" "ignore" "ok" "$MKL_HOST"
+    else
+        mkl_check_done "cross" "" "ignore" "ok" "local"
+    fi
+
+
+
     # Try to figure out what OS/distro we are running on.
-    mkl_check_begin "distro" "" "no-cache" "OS or distribution"
+    mkl_check_begin "distro" "" "no-cache" "build OS or distribution"
 
     # Try lsb_release
     local sys
@@ -51,7 +64,12 @@ function checks {
         mkl_check_done "distro" "" "ignore" "ok" "$sys"
         mkl_mkvar_set "distro" "MKL_DISTRO" "$sys"
     fi
+
+    if [[ -z $MKL_HOST_TYPE ]]; then
+        mkl_mkvar_set "cross" MKL_HOST_TYPE "$MKL_DISTRO"
+    fi
 }
+
 
 #function checks {
 #    mkl_check_begin "host" "HOST_OS" "no-cache" "host OS"

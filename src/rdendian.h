@@ -90,7 +90,7 @@
 #define be16toh(x) OSSwapInt16(x)
 #endif
 
-#elif defined(_MSC_VER)
+#elif defined(HOST_WIN32)
 #include <intrin.h>
 
 #define be64toh(x) _byteswap_uint64(x)
