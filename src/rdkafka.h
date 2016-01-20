@@ -71,6 +71,8 @@ typedef SSIZE_T ssize_t;
 #else
 #define RD_EXPORT __declspec(dllimport)
 #endif
+#else
+#define RD_EXPORT
 #endif
 /* @endcond */
 

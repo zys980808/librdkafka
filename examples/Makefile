@@ -4,8 +4,6 @@ EXAMPLES ?= rdkafka_example_cpp rdkafka_consumer_example_cpp kafkatest_verifiabl
 
 # Dont build C clients on Windows (they use some non-portable POSIX stuff)
 ifneq ($(MKL_HOST_TYPE), win32)
-asdgasdgasdgasdg a sdg asdg asgd
-
 EXAMPLES += rdkafka_example rdkafka_performance rdkafka_consumer_example
 endif
 

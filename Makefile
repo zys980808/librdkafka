@@ -48,6 +48,7 @@ clean:
 	@$(MAKE) -C tests $@
 	@$(MAKE) -C examples $@
 	@(for d in $(LIBSUBDIRS); do $(MAKE) -C $$d $@ ; done)
+	rm -f _mkltmp*
 
 distclean: clean
 	./configure --clean

@@ -59,7 +59,6 @@
 #include <fcntl.h>
 #define __STDC_FORMAT_MACROS
 #include <inttypes.h>
-#define PRId64 "I64d"
 
 #ifdef HOST_WIN32
 #include <io.h>

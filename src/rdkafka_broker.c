@@ -880,7 +880,6 @@ static int rd_kafka_req_response (rd_kafka_broker_t *rkb,
                 return -1;
 	}
 
-        #define PRIusz "Iu"
 	rd_rkb_dbg(rkb, PROTOCOL, "RECV",
 		   "Received %sResponse (v%hd, %"PRIusz" bytes, CorrId %"PRId32
 		   ", rtt %.2fms)",
