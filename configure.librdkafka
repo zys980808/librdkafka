@@ -81,10 +81,8 @@ function checks {
         mkl_allvar_set WITH_SNAPPY WITH_SNAPPY y
     fi
 
-    if [[ $HOST_LINUX == y ]]; then
-       # -lrt is needed on linux for clock_gettime: link it if it exists.
-       mkl_lib_check "librt" "" cont CC "-lrt"
-    fi
+    # -lrt is needed on linux for clock_gettime: link it if it exists.
+    mkl_lib_check "librt" "" cont CC "-lrt"
 
     # Older g++ (<=4.1?) gives invalid warnings for the C++ code.
     mkl_mkvar_append CXXFLAGS CXXFLAGS "-Wno-non-virtual-dtor"

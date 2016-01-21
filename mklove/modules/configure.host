@@ -24,6 +24,7 @@ function checks {
     fi
 
     if [[ -n $MKL_HOST ]]; then
+        # --host indicates cross build
         mkl_mkvar_set "cross" MKL_CROSS y
         mkl_mkvar_set "cross" MKL_TOOL_PREFIX "$MKL_HOST"-
         mkl_check_done "cross" "" "ignore" "ok" "$MKL_HOST"
