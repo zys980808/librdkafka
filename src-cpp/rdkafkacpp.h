@@ -1031,11 +1031,10 @@ class RD_EXPORT Topic {
    * The offset will be committed (written) to the offset store according
    * to \p auto.commit.interval.ms.
    *
-   * @remark This API should only be used with the simple RdKafka::Consumer,
-   *         not the high-level RdKafka::KafkaConsumer.
-   * @remark \c auto.commit.enable must be set to \c false when using this API.
+   * @remark \c enable.auto.offset.store must be set to \c false when using this API.
    *
-   * @returns RdKafka::ERR_NO_ERROR on success or an error code on error.
+   * @returns RdKafka::ERR_NO_ERROR on success or an error code if none of the
+   *          offsets could be stored.
    */
   virtual ErrorCode offset_store (int32_t partition, int64_t offset) = 0;
 };
@@ -1358,6 +1357,20 @@ public:
    *          Else returns an error code.
    */
   virtual ErrorCode position (std::vector<TopicPartition*> &partitions) = 0;
+
+
+  /**
+   * @brief Store offset \p offset for topic partition \p partition.
+   * The offset will be committed (written) to the offset store according
+   * to \p auto.commit.interval.ms or the next manual offset-less commit*()
+   *
+   * Per-partition success/error status propagated through TopicPartition.err()
+   *
+   * @remark \c enable.auto.offset.store must be set to \c false when using this API.
+   *
+   * @returns RdKafka::ERR_NO_ERROR on success or an error code on error.
+   */
+  virtual ErrorCode offsets_store (std::vector<TopicPartition*> &offsets) = 0;
 
 
   /**

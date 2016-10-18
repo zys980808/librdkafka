@@ -2543,6 +2543,21 @@ int rd_kafka_topic_partition_list_count_abs_offsets (
 	return valid_cnt;
 }
 
+
+/**
+ * Returns a new shared toppar pointer for the provided rktpar
+ */
+shptr_rd_kafka_toppar_t *
+rd_kafka_topic_partition_get_toppar (rd_kafka_t *rk,
+                                     const rd_kafka_topic_partition_t *rktpar) {
+        shptr_rd_kafka_toppar_t *s_rktp;
+        if ((s_rktp = rktpar->_private))
+                return rd_kafka_toppar_keep(rd_kafka_toppar_s2i(s_rktp));
+
+        return rd_kafka_toppar_get2(rk, rktpar->topic, rktpar->partition, 0, 0);
+}
+
+
 /**
  * Returns a new shared toppar pointer for partition at index 'idx',
  * or NULL if not set, not found, or out of range.
@@ -2550,18 +2565,11 @@ int rd_kafka_topic_partition_list_count_abs_offsets (
 shptr_rd_kafka_toppar_t *
 rd_kafka_topic_partition_list_get_toppar (
         rd_kafka_t *rk, rd_kafka_topic_partition_list_t *rktparlist, int idx) {
-        rd_kafka_topic_partition_t *rktpar;
-        shptr_rd_kafka_toppar_t *s_rktp;
 
         if (idx >= rktparlist->cnt)
                 return NULL;
 
-        rktpar = &rktparlist->elems[idx];
-
-        if ((s_rktp = rktpar->_private))
-                return rd_kafka_toppar_keep(rd_kafka_toppar_s2i(s_rktp));
-
-        return rd_kafka_toppar_get2(rk, rktpar->topic, rktpar->partition, 0, 0);
+        return rd_kafka_topic_partition_get_toppar(rk, &rktparlist->elems[idx]);
 }
 
 
