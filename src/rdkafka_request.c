@@ -282,7 +282,9 @@ void rd_kafka_OffsetRequest (rd_kafka_broker_t *rkb,
 		rd_kafka_buf_write_i32(rkbuf, offset_cnt);
 	}
 
-	rd_kafka_buf_autopush(rkbuf);
+        rd_kafka_buf_autopush(rkbuf);
+
+        rkbuf->rkbuf_retries = RD_KAFKA_BUF_NO_RETRIES;
 
 	rd_rkb_dbg(rkb, TOPIC, "OFFSET",
 		   "OffsetRequest (%"PRIdsz" offsets) for "

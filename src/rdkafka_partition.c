@@ -1090,8 +1090,22 @@ static void rd_kafka_toppar_handle_Offset (rd_kafka_t *rk,
 			rd_kafka_toppar_destroy(s_rktp);
 			return;
 
-		} else if (err == RD_KAFKA_RESP_ERR__IN_PROGRESS)
-			return; /* Retry in progress */
+                } else if (err == RD_KAFKA_RESP_ERR__IN_PROGRESS) {
+                        return; /* Retry in progress */
+
+                } else if (err == RD_KAFKA_RESP_ERR__TIMED_OUT ||
+                           err == RD_KAFKA_RESP_ERR__TIMED_OUT_QUEUE) {
+                        /* If Offset query timed out just keep trying,
+                         * the broker is probably down for the moment. */
+                        rd_kafka_toppar_lock(rktp);
+                        rd_kafka_toppar_offset_request(rktp,
+                                                       rktp->rktp_query_offset,
+                                                       1000);
+                        rd_kafka_toppar_unlock(rktp);
+                        rd_kafka_toppar_destroy(s_rktp);
+                        return;
+                }
+
 
 
                 rd_kafka_toppar_lock(rktp);
@@ -1832,16 +1846,13 @@ void rd_kafka_toppar_op_serve (rd_kafka_t *rk, rd_kafka_op_t *rko) {
 				     rktp->rktp_partition,
 				     rd_kafka_err2str(rko->rko_err));
 
-			/* Keep on querying until we succeed. */
-			rd_kafka_toppar_set_fetch_state(rktp, RD_KAFKA_TOPPAR_FETCH_OFFSET_QUERY);
+                        /* Keep on querying until we succeed. */
+                        rd_kafka_toppar_offset_request(rktp,
+                                                       rktp->rktp_query_offset,
+                                                       500);
 
-			rd_kafka_toppar_unlock(rktp);
+                        rd_kafka_toppar_unlock(rktp);
 
-			rd_kafka_timer_start(&rktp->rktp_rkt->rkt_rk->rk_timers,
-					     &rktp->rktp_offset_query_tmr,
-					     500*1000,
-					     rd_kafka_offset_query_tmr_cb,
-					     rktp);
 
 			/* Propagate error to application */
 			if (rko->rko_err != RD_KAFKA_RESP_ERR__WAIT_COORD) {
