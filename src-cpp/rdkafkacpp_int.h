@@ -649,12 +649,12 @@ public:
     // FIXME: metadata
   }
 
-  int partition () { return partition_; }
+  int partition () const { return partition_; }
   const std::string &topic () const { return topic_ ; }
 
-  int64_t offset () { return offset_; }
+  int64_t offset () const { return offset_; }
 
-  ErrorCode err () { return err_; }
+  ErrorCode err () const { return err_; }
 
   void set_offset (int64_t offset) { offset_ = offset; }
 

@@ -1041,16 +1041,16 @@ public:
   virtual const std::string &topic () const = 0;
 
   /** @returns partition id */
-  virtual int partition () = 0;
+  virtual int partition () const = 0;
 
   /** @returns offset (if applicable) */
-  virtual int64_t offset () = 0;
+  virtual int64_t offset () const = 0;
 
   /** @brief Set offset */
   virtual void set_offset (int64_t offset) = 0;
 
   /** @returns error code (if applicable) */
-  virtual ErrorCode err () = 0;
+  virtual ErrorCode err () const = 0;
 };
 
 
