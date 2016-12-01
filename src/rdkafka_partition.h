@@ -220,6 +220,13 @@ struct rd_kafka_toppar_s { /* rd_kafka_toppar_t */
         shptr_rd_kafka_toppar_t *rktp_s_for_rkb;  /* Shared pointer for
                                                    * rkb_toppars list */
 
+        rd_list_t rktp_wait_leader_futures;       /* List of futures awaiting
+                                                   * this partition to be
+                                                   * assigned a leader broker.
+                                                   * Future result is
+                                                   * (rd_kafka_broker_t *)
+                                                   * with increased refcount. */
+
 	/*
 	 * Timers
 	 */

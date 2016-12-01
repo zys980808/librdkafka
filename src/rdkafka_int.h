@@ -401,3 +401,27 @@ int rd_kafka_poll_cb (rd_kafka_t *rk, rd_kafka_op_t *rko,
 
 rd_kafka_resp_err_t rd_kafka_subscribe_rkt (rd_kafka_itopic_t *rkt);
 
+
+
+/**
+ * Common future result types
+ */
+
+typedef struct rd_kafka_future_err_s {
+        rd_kafka_resp_err_t err;
+} rd_kafka_future_err_t;
+
+/**
+ * @brief Allocate and return a wrapped error for future_t result use
+ */
+static RD_UNUSED
+rd_kafka_future_err_t *rd_kafka_future_err (rd_kafka_resp_err_t err) {
+        rd_kafka_future_err_t *ferr = malloc(sizeof(*ferr));
+        ferr->err = err;
+        return ferr;
+}
+
+static RD_INLINE RD_UNUSED
+void rd_kafka_future_err_destroy (rd_kafka_future_err_t *ferr) {
+        rd_free(ferr);
+}

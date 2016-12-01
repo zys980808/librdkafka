@@ -189,6 +189,7 @@ shptr_rd_kafka_toppar_t *rd_kafka_toppar_new0 (rd_kafka_itopic_t *rkt,
         rktp->rktp_ops    = rd_kafka_q_new(rkt->rkt_rk);
         rd_atomic32_init(&rktp->rktp_version, 1);
 	rktp->rktp_op_version = rd_atomic32_get(&rktp->rktp_version);
+        rd_list_init(&rktp->rktp_wait_leader_futures, 16);
 
         /* Consumer: If statistics is available we query the oldest offset
          * of each partition.
@@ -260,6 +261,9 @@ void rd_kafka_toppar_destroy_final (rd_kafka_toppar_t *rktp) {
 			 RD_KAFKA_RESP_ERR__DESTROY);
 	rd_kafka_q_destroy(rktp->rktp_fetchq);
         rd_kafka_q_destroy(rktp->rktp_ops);
+
+        rd_kafka_assert(NULL, rd_list_empty(&rktp->rktp_wait_leader_futures));
+        rd_list_destroy(&rktp->rktp_wait_leader_futures, NULL);
 
 	rd_kafka_replyq_destroy(&rktp->rktp_replyq);
 
@@ -2190,6 +2194,55 @@ rd_kafka_broker_t *rd_kafka_toppar_leader (rd_kafka_toppar_t *rktp,
 
         return rkb;
 }
+
+
+#if 0 /* FIXME: futures */
+/**
+ * @returns the proper leader broker for this toppar, or if no
+ *          leader is available a future is created which will complete
+ *          when a leader becomes available (or permanently fails).
+ */
+rd_kafka_broker_t *rd_kafka_toppar_leader_or_future (rd_kafka_toppar_t *rktp,
+                                                     rd_future_t **rfut) {
+        rd_kafka_broker_t *rkb;
+
+        rd_kafka_toppar_lock(rktp);
+        rkb = rktp->rktp_leader;
+        if (rkb && rkb->rkb_source != RD_KAFKA_INTERNAL) {
+                rd_kafka_broker_keep(rkb);
+        } else {
+                rkb = NULL;
+
+                *rfut = rd_future_new(NULL);
+                rd_list_add(&rktp->rktp_wait_leader_futures, *rfut);
+                rd_future_keep(*rfut);
+        }
+        rd_kafka_toppar_unlock(rktp);
+
+        return rkb;
+}
+
+
+static int _apply_set_result (void *elem, void *opaque) {
+        rd_future_t *rfut = elem;
+        rd_kafka_broker_t *rkb = opaque;
+
+        if (rd_future_set_result(rfut, rkb) != -1 && rkb)
+                rd_kafka_broker_keep(rkb);
+
+        return 0; /* Remove entry from list. */
+}
+
+/**
+ * @brief Complete any waiting futures with updated partition leader info.
+ * @remark toppar_lock() MUST be held.
+ * @locality Any thread
+ */
+void rd_kafka_toppar_leader_propagate (rd_kafka_toppar_t *rktp,
+                                       rd_kafka_broker_t *rkb) {
+        rd_list_apply(&rktp->rktp_wait_leader_futures, _apply_set_result, rkb);
+}
+#endif
 
 
 const char *
