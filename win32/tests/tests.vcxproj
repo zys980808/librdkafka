@@ -139,6 +139,7 @@
     <ClCompile Include="..\..\tests\0053-stats_cb.cpp" />
     <ClCompile Include="..\..\tests\0054-offset_time.cpp" />
     <ClCompile Include="..\..\tests\test.c" />
+    <ClCompile Include="..\..\tests\testcpp.cpp" />
     <ClCompile Include="..\..\src\tinycthread.c" />
     <ClCompile Include="..\..\src\rdlist.c" />
   </ItemGroup>
