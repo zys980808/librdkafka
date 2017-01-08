@@ -393,6 +393,7 @@ struct rd_kafka_buf_s { /* rd_kafka_buf_t */
                         char *reason;       /* Textual reason */
                         rd_kafka_op_t *rko; /* Originating rko with replyq
                                              * (if any) */
+                        int full_incr;      /* Full request counter increased*/
                 } Metadata;
         } rkbuf_u;
 };

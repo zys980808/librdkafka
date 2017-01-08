@@ -70,9 +70,6 @@ rd_kafka_metadata (rd_kafka_t *rk, int all_topics,
         /* Async: request metadata */
         rko = rd_kafka_op_new(RD_KAFKA_OP_METADATA);
         rd_kafka_op_set_replyq(rko, rkq, 0);
-        if (unlikely(rd_list_cnt(&topics) == 0))
-                rd_atomic32_add(&rk->rk_metadata_cache.
-                                rkmc_full_sent, 1);
         rd_kafka_MetadataRequest(rkb, &topics, "application requested", rko);
 
         rd_list_destroy(&topics);
@@ -222,6 +219,7 @@ rd_kafka_parse_Metadata (rd_kafka_broker_t *rkb,
         int all_topics = !requested_topics || !rd_list_cnt(requested_topics);
         const char *reason = request->rkbuf_u.Metadata.reason ?
                 request->rkbuf_u.Metadata.reason : "(no reason)";
+        int ApiVersion = request->rkbuf_reqhdr.ApiVersion;
 
         rd_kafka_assert(NULL, thrd_is_current(rk->rk_thread));
 
@@ -268,8 +266,24 @@ rd_kafka_parse_Metadata (rd_kafka_broker_t *rkb,
                 rd_kafka_buf_read_i32a(rkbuf, md->brokers[i].id);
                 rd_kafka_buf_read_str_tmpabuf(rkbuf, &tbuf, md->brokers[i].host);
 		rd_kafka_buf_read_i32a(rkbuf, md->brokers[i].port);
+
+                if (ApiVersion >= 1) {
+                        rd_kafkap_str_t rack;
+                        rd_kafka_buf_read_str(rkbuf, &rack);
+                }
 	}
 
+        if (ApiVersion >= 2) {
+                rd_kafkap_str_t cluster_id;
+                rd_kafka_buf_read_str(rkbuf, &cluster_id);
+                rd_rkb_dbg(rkb, METADATA, "METADATA", "ClusterId: %.*s",
+                           RD_KAFKAP_STR_PR(&cluster_id));
+        }
+
+        if (ApiVersion >= 1) {
+                int32_t controller_id;
+                rd_kafka_buf_read_i32(rkbuf, &controller_id);
+        }
 
 	/* Read TopicMetadata */
 	rd_kafka_buf_read_i32a(rkbuf, md->topic_cnt);
@@ -752,22 +766,9 @@ rd_kafka_metadata_refresh_topics (rd_kafka_t *rk, rd_kafka_broker_t *rkb,
                 return RD_KAFKA_RESP_ERR_NO_ERROR;
         }
 
-        if (rd_atomic32_get(&rk->rk_metadata_cache.rkmc_full_sent) > 0) {
-                rd_kafka_dbg(rk, METADATA, "METADATA",
-                             "Skipping metadata refresh of %d topic(s): "
-                             "full request already in transit",
-                             rd_list_cnt(topics));
-                rd_list_destroy(&q_topics);
-                if (destroy_rkb)
-                        rd_kafka_broker_destroy(rkb);
-                return RD_KAFKA_RESP_ERR_NO_ERROR;
-        }
-
         rd_kafka_dbg(rk, METADATA, "METADATA",
                      "Requesting metadata for %d/%d topics: %s",
                      rd_list_cnt(&q_topics), rd_list_cnt(topics), reason);
-
-
 
         rd_kafka_MetadataRequest(rkb, &q_topics, reason, NULL);
 
@@ -832,8 +833,8 @@ rd_kafka_metadata_refresh_known_topics (rd_kafka_t *rk, rd_kafka_broker_t *rkb,
 rd_kafka_resp_err_t
 rd_kafka_metadata_refresh_brokers (rd_kafka_t *rk, rd_kafka_broker_t *rkb,
                                    const char *reason) {
-        /* FIXME: need KIP-4 to make sparse (no topics) metadata requests */
-        return rd_kafka_metadata_refresh_all(rk, rkb, reason);
+        return rd_kafka_metadata_request(rk, rkb, NULL /*brokers only*/,
+                                         reason, NULL);
 }
 
 
@@ -850,6 +851,7 @@ rd_kafka_resp_err_t
 rd_kafka_metadata_refresh_all (rd_kafka_t *rk, rd_kafka_broker_t *rkb,
                                const char *reason) {
         int destroy_rkb = 0;
+        rd_list_t topics;
 
         if (!rk)
                 rk = rkb->rkb_rk;
@@ -860,18 +862,9 @@ rd_kafka_metadata_refresh_all (rd_kafka_t *rk, rd_kafka_broker_t *rkb,
                 destroy_rkb = 1;
         }
 
-        if (rd_atomic32_add(&rk->rk_metadata_cache.rkmc_full_sent, 1) > 1) {
-                /* A full request is already in transit */
-                rd_kafka_dbg(rk, METADATA, "METADATA",
-                             "Skipping full metadata refresh: "
-                             "full request already in transit");
-                rd_atomic32_sub(&rk->rk_metadata_cache.rkmc_full_sent, 1);
-                if (destroy_rkb)
-                        rd_kafka_broker_destroy(rkb);
-                return RD_KAFKA_RESP_ERR_NO_ERROR;
-        }
-
-        rd_kafka_MetadataRequest(rkb, NULL, reason, NULL);
+        rd_list_init(&topics, 0, NULL); /* empty list = all topics */
+        rd_kafka_MetadataRequest(rkb, &topics, reason, NULL);
+        rd_list_destroy(&topics);
 
         if (destroy_rkb)
                 rd_kafka_broker_destroy(rkb);
@@ -888,21 +881,21 @@ rd_kafka_metadata_refresh_all (rd_kafka_t *rk, rd_kafka_broker_t *rkb,
  * @locality any
  */
 rd_kafka_resp_err_t
-rd_kafka_metadata_request (rd_kafka_t *rk, const rd_list_t *topics,
+rd_kafka_metadata_request (rd_kafka_t *rk, rd_kafka_broker_t *rkb,
+                           const rd_list_t *topics,
                            const char *reason, rd_kafka_op_t *rko) {
-        rd_kafka_broker_t *rkb;
+        int destroy_rkb = 0;
 
-        rd_kafka_rdlock(rk);
-        if (!(rkb = rd_kafka_broker_any_usable(rk, RD_POLL_NOWAIT, 1)))
-                return RD_KAFKA_RESP_ERR__TRANSPORT;
-        rd_kafka_rdunlock(rk);
-
-        if (!topics || !rd_list_cnt(topics))
-                rd_atomic32_add(&rk->rk_metadata_cache.rkmc_full_sent, 1);
+        if (!rkb) {
+                if (!(rkb = rd_kafka_broker_any_usable(rk, RD_POLL_NOWAIT, 1)))
+                        return RD_KAFKA_RESP_ERR__TRANSPORT;
+                destroy_rkb = 1;
+        }
 
         rd_kafka_MetadataRequest(rkb, topics, reason, rko);
 
-        rd_kafka_broker_destroy(rkb);
+        if (destroy_rkb)
+                rd_kafka_broker_destroy(rkb);
 
         return RD_KAFKA_RESP_ERR_NO_ERROR;
 }

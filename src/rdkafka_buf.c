@@ -42,6 +42,15 @@ void rd_kafka_buf_destroy_final (rd_kafka_buf_t *rkbuf) {
                 if (rkbuf->rkbuf_u.Metadata.rko)
                         rd_kafka_op_reply(rkbuf->rkbuf_u.Metadata.rko,
                                           RD_KAFKA_RESP_ERR__DESTROY);
+                if (rkbuf->rkbuf_u.Metadata.full_incr && rkbuf->rkbuf_rkb) {
+                        /* Decrease metadata cache's full_sent state. */
+                        rd_kafka_t *rk = rkbuf->rkbuf_rkb->rkb_rk;
+                        rd_kafka_assert(NULL,
+                                        rd_atomic32_get(&rk->rk_metadata_cache.
+                                                        rkmc_full_sent) > 0);
+                        rd_atomic32_sub(&rk->rk_metadata_cache.
+                                        rkmc_full_sent, 1);
+                }
                 break;
         }
 
@@ -557,6 +566,8 @@ void rd_kafka_buf_callback (rd_kafka_t *rk,
                 return;
 	}
 
+        rd_rkb_dbg(rkb, METADATA, "XX",
+                   "rkbuf %p, err %s: replyq.q %p",request,rd_kafka_err2str(err), request->rkbuf_replyq.q);
         if (err != RD_KAFKA_RESP_ERR__DESTROY && request->rkbuf_replyq.q) {
                 rd_kafka_op_t *rko = rd_kafka_op_new(RD_KAFKA_OP_RECV_BUF);
 

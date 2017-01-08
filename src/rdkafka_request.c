@@ -1244,8 +1244,11 @@ static void rd_kafka_handle_Metadata (rd_kafka_t *rk,
         rd_kafka_op_t *rko = opaque; /* Possibly NULL */
         struct rd_kafka_metadata *md = NULL;
         const rd_list_t *topics = request->rkbuf_u.Metadata.topics;
-        int all_topics = !topics;
 
+        rd_rkb_dbg(rkb, METADATA, "XX",
+                   "handle_Metadata %p: %s: err %s: in thr %s\n",
+                   request, request->rkbuf_u.Metadata.reason,
+                   rd_kafka_err2str(err), rd_kafka_thread_name);
         rd_kafka_assert(NULL, err == RD_KAFKA_RESP_ERR__DESTROY ||
                         thrd_is_current(rk->rk_thread));
 
@@ -1266,10 +1269,9 @@ static void rd_kafka_handle_Metadata (rd_kafka_t *rk,
 			   (int)(request->rkbuf_ts_sent/1000));
 	} else {
 
-                if (all_topics)
+                if (!topics)
                         rd_rkb_dbg(rkb, METADATA, "METADATA",
-                                   "===== Received metadata "
-                                   "(for all topics): %s =====",
+                                   "===== Received metadata: %s =====",
                                    request->rkbuf_u.Metadata.reason);
                 else
                         rd_rkb_dbg(rkb, METADATA, "METADATA",
@@ -1300,14 +1302,6 @@ static void rd_kafka_handle_Metadata (rd_kafka_t *rk,
         }
 
  done:
-        if (all_topics) {
-                /* Decrease metadata cache's full_sent state. */
-                rd_kafka_assert(NULL,
-                                rd_atomic32_get(&rk->rk_metadata_cache.
-                                                rkmc_full_sent) > 0);
-                rd_atomic32_sub(&rk->rk_metadata_cache.rkmc_full_sent, 1);
-        }
-
         if (rko)
                 rd_kafka_op_destroy(rko);
 }
@@ -1319,31 +1313,86 @@ static void rd_kafka_handle_Metadata (rd_kafka_t *rk,
  *
  * \p topics is a list of topic names (char *) to request.
  *
- * !topics          - all topics in cluster are requested
- *  topics          - only specified topics are requested
+ * !topics          - only request brokers (if supported by broker, else
+ *                    all topics)
+ *  topics.cnt==0   - all topics in cluster are requested
+ *  topics.cnt >0   - only specified topics are requested
  *
  * @param reason    - metadata request reason
- * @param rko       - (optional) rko with replyq for handling response
+ * @param rko       - (optional) rko with replyq for handling response.
+ *                    Specifying an rko forces a metadata request even if
+ *                    there is already a matching one in-transit.
  *
+ * If full metadata for all topics is requested (or all brokers, which
+ * results in all-topics on older brokers) and there is already a full request
+ * in transit then this function will return RD_KAFKA_RESP_ERR__PREV_IN_PROGRESS
+ * otherwise RD_KAFKA_RESP_ERR_NO_ERROR. If \p rko is non-NULL the request
+ * is sent regardless.
  */
-void rd_kafka_MetadataRequest (rd_kafka_broker_t *rkb,
-                               const rd_list_t *topics, const char *reason,
-                               rd_kafka_op_t *rko) {
+rd_kafka_resp_err_t
+rd_kafka_MetadataRequest (rd_kafka_broker_t *rkb,
+                          const rd_list_t *topics, const char *reason,
+                          rd_kafka_op_t *rko) {
         rd_kafka_buf_t *rkbuf;
+        int16_t ApiVersion = 0;
+        int features;
+        int topic_cnt = topics ? rd_list_cnt(topics) : 0;
+
+        ApiVersion = rd_kafka_broker_ApiVersion_supported(rkb,
+                                                          RD_KAFKAP_Metadata,
+                                                          0, 2,
+                                                          &features);
 
         rkbuf = rd_kafka_buf_new_growable(rkb->rkb_rk, RD_KAFKAP_Metadata, 1,
                                           4 +
-                                          (50 *
-                                           (topics ? rd_list_cnt(topics) : 0)));
+                                          (50 * topic_cnt));
 
         if (!reason)
                 reason = "";
 
         rkbuf->rkbuf_u.Metadata.reason = rd_strdup(reason);
 
-        rd_kafka_buf_write_i32(rkbuf, topics ? rd_list_cnt(topics) : 0);
+        rd_rkb_dbg(rkb, METADATA, "METADATA", "apiversion %hd for topics %p %d: %s",
+                   ApiVersion, topics, topic_cnt, reason);
+        if (!topics && ApiVersion > 0) {
+                /* a null(-1) array (in the protocol) represents no topics */
+                rd_kafka_buf_write_i32(rkbuf, -1);
+                rd_rkb_dbg(rkb, METADATA, "METADATA",
+                           "Request metadata for brokers only: %s", reason);
 
-        if (topics && rd_list_cnt(topics) > 0) {
+        } else {
+                if (topic_cnt == 0 && !rko) {
+                        /* Avoid multiple outstanding full requests
+                         * (since they are redundant and side-effect-less). */
+
+                        /* Decrement full_sent on buf destroy */
+                        rkbuf->rkbuf_u.Metadata.full_incr = 1;
+
+                        if (rd_atomic32_add(&rkb->rkb_rk->rk_metadata_cache.
+                                            rkmc_full_sent, 1) > 1) {
+                                rd_rkb_dbg(rkb, METADATA, "METADATA",
+                                           "Request metadata for all topics: "
+                                           "%s: skipped: "
+                                           "full request already in-transit",
+                                           reason);
+                                rd_kafka_buf_destroy(rkbuf);
+                                return RD_KAFKA_RESP_ERR__PREV_IN_PROGRESS;
+                        }
+                }
+
+                rd_kafka_buf_write_i32(rkbuf, topic_cnt);
+
+                if (topic_cnt == 0)
+                        rd_rkb_dbg(rkb, METADATA, "METADATA",
+                                   "Request metadata for all topics: "
+                                   "%s", reason);
+                else
+                        rd_rkb_dbg(rkb, METADATA, "METADATA",
+                                   "Request metadata for %d topic(s): "
+                                   "%s", topic_cnt, reason);
+        }
+
+        if (topic_cnt > 0) {
                 char *topic;
                 int i;
 
@@ -1355,22 +1404,18 @@ void rd_kafka_MetadataRequest (rd_kafka_broker_t *rkb,
                 RD_LIST_FOREACH(topic, topics, i)
                         rd_kafka_buf_write_str(rkbuf, topic, -1);
 
-                rd_rkb_dbg(rkb, METADATA, "METADATA",
-                           "Request metadata for %d topic(s): %s",
-                           rd_list_cnt(topics), reason);
-
-        } else {
-                /* Full metadata request */
-                rd_rkb_dbg(rkb, METADATA, "METADATA",
-                           "Request metadata for all topics: %s", reason);
         }
 
         rd_kafka_buf_autopush(rkbuf);
+
+        rd_kafka_buf_ApiVersion_set(rkbuf, ApiVersion, 0);
 
         /* Metadata requests are part of the important control plane
          * and should go before other requests (Produce, Fetch, etc). */
         rkbuf->rkbuf_flags |= RD_KAFKA_OP_F_FLASH;
 
+        rd_rkb_dbg(rkb, METADATA, "XX", "enq rkbuf %p on %p: %s",
+                   rkbuf, rkb->rkb_rk->rk_ops, reason);
         rd_kafka_broker_buf_enq_replyq(rkb, rkbuf,
                                        /* Handle response thru rk_ops,
                                         * but forward parsed result to
@@ -1378,6 +1423,8 @@ void rd_kafka_MetadataRequest (rd_kafka_broker_t *rkb,
                                        RD_KAFKA_REPLYQ(rkb->rkb_rk->
                                                        rk_ops, 0),
                                        rd_kafka_handle_Metadata, rko);
+
+        return RD_KAFKA_RESP_ERR_NO_ERROR;
 }
 
 
@@ -1391,7 +1438,8 @@ void rd_kafka_MetadataRequest (rd_kafka_broker_t *rkb,
 /**
  * @brief Parses and handles ApiVersion reply.
  *
- * @param apis will be allocated and populated with broker's supported APIs.
+ * @param apis will be allocated, populated and sorted
+ *             with broker's supported APIs.
  * @param api_cnt will be set to the number of elements in \p *apis
 
  * @returns 0 on success, else an error.
@@ -1444,6 +1492,8 @@ rd_kafka_handle_ApiVersion (rd_kafka_t *rk,
         }
 
 	*api_cnt = ApiArrayCnt;
+        qsort(*apis, *api_cnt, sizeof(**apis), rd_kafka_ApiVersion_key_cmp);
+
 	goto done;
 
  err:

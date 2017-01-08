@@ -63,7 +63,8 @@ rd_kafka_metadata_refresh_all (rd_kafka_t *rk, rd_kafka_broker_t *rkb,
                                const char *reason);
 
 rd_kafka_resp_err_t
-rd_kafka_metadata_request (rd_kafka_t *rk, const rd_list_t *topics,
+rd_kafka_metadata_request (rd_kafka_t *rk, rd_kafka_broker_t *rkb,
+                           const rd_list_t *topics,
                            const char *reason, rd_kafka_op_t *rko);
 
 

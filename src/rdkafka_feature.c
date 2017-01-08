@@ -256,6 +256,10 @@ int rd_kafka_get_legacy_ApiVersions (const char *broker_version,
 	};
 	int i;
 	int fallback_i = -1;
+        int ret = 0;
+
+        *apisp = NULL;
+        *api_cntp = 0;
 
 	for (i = 0 ; vermap[i].pfx ; i++) {
 		if (!strncmp(vermap[i].pfx, broker_version, strlen(vermap[i].pfx))) {
@@ -263,19 +267,24 @@ int rd_kafka_get_legacy_ApiVersions (const char *broker_version,
 				return 0;
 			*apisp = vermap[i].apis;
 			*api_cntp = vermap[i].api_cnt;
-			return 1;
+                        ret = 1;
+                        break;
 		} else if (fallback && !strcmp(vermap[i].pfx, fallback))
 			fallback_i = i;
 	}
 
-	if (fallback) {
+	if (!*apisp && fallback) {
 		rd_kafka_assert(NULL, fallback_i != -1);
 		*apisp    = vermap[fallback_i].apis;
 		*api_cntp = vermap[fallback_i].api_cnt;
-		return 0;
 	}
 
-	return 0;
+        if (*apisp)
+                qsort(*apisp, *api_cntp, sizeof(**apisp),
+                      rd_kafka_ApiVersion_key_cmp);
+
+
+        return ret;
 }
 
 
@@ -335,10 +344,6 @@ int rd_kafka_features_check (rd_kafka_broker_t *rkb,
 			     size_t broker_api_cnt) {
 	int features = 0;
 	int i;
-
-	/* Sort broker_apis for faster lookups. */
-	qsort(broker_apis, broker_api_cnt, sizeof(*broker_apis),
-	      rd_kafka_ApiVersion_key_cmp);
 
 	/* Scan through features. */
 	for (i = 0 ; rd_kafka_feature_map[i].feature != 0 ; i++) {
