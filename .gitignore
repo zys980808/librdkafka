@@ -27,3 +27,5 @@ staging-docs
 tmp
 stats*.json
 test_report*.json
+dest
+artifacts
