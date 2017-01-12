@@ -25,6 +25,7 @@ deploy:
   secret_access_key:
     secure: q7rWZkwQqyIFu3i32y/rJsKF1AJpwIqQe3AhBFEqjCz80mdEYysvcHBfl956EAAr4qbR3umIKbkhRwbBVyDGlMaraZiR7YFgAO+v0DRFeMiF5XFE3KHNIpCQHSKnzOiL65TpJHZIoB+6w0lAbBVzj87MBN0axAeArHKiO1y8Eec=
   bucket: librdkafka-ci-packages
+  region: us-west-1
   skip_cleanup: true
   local-dir: artifacts
   upload-dir: travis-${TRAVIS_OS_NAME}-${ARCH}-tag_${TRAVIS_TAG}-${TRAVIS_COMMIT}-${TRAVIS_BUILD_ID}
@@ -34,3 +35,4 @@ deploy:
     repo: edenhill/librdkafka
     branch: ci-s3-test
     #tags: true  ## for tag builds only
+##
