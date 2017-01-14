@@ -36,6 +36,13 @@ nuget {
 	};
  };
 
+ Linkage {
+        choices : { dynamic,static };
+        description = "Which version of the .lib file to link to this library";
+        dynamic.description = "Dynamic Library (DLL)";
+        static.description = "Static library";
+ };
+
  files {
 	#defines {
 	  TOPDIR = ..\;
@@ -47,11 +54,14 @@ nuget {
 	docs: { ${TOPDIR}README.md, ${TOPDIR}CONFIGURATION.md, ${TOPDIR}LICENSES.txt };
 
         ("v120,v140", "Win32,x64", "Release,Debug") => {
-           [${0},${1},${2}] {
-		lib: { outdir\${0}\${1}\${2}\librdkafka*.lib };
+           [${0},${1},${2},dynamic] {
+		lib: { outdir\${0}\${1}\${2}\librdkafka.lib, outdir\${0}\${1}\${2}\librdkafkacpp.lib };
 		symbols: { outdir\${0}\${1}\${2}\librdkafka*.pdb };
 		bin: { outdir\${0}\${1}\${2}\*.dll };
            };
+           [${0},${1},${2},static] {
+		lib: { outdir\${0}\${1}\${2}\librdkafka-static.lib, outdir\${0}\${1}\${2}\librdkafkacpp-static.lib };
+          };
 	};
 
  };
