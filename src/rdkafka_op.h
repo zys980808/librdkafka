@@ -314,7 +314,9 @@ int rd_kafka_op_handle (rd_kafka_t *rk, rd_kafka_op_t *rko,
                         int (*callback) (rd_kafka_t *rk, rd_kafka_op_t *rko,
                                          int cb_type, void *opaque));
 
+#if ENABLE_DEVEL
 extern rd_atomic32_t rd_kafka_op_cnt;
+#endif
 
 void rd_kafka_op_print (FILE *fp, const char *prefix, rd_kafka_op_t *rko);
 

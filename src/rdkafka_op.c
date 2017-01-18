@@ -35,8 +35,9 @@
 #include "rdkafka_offset.h"
 
 /* Current number of rd_kafka_op_t */
+#if ENABLE_DEVEL
 rd_atomic32_t rd_kafka_op_cnt;
-
+#endif
 
 const char *rd_kafka_op2str (rd_kafka_op_type_t type) {
         int skiplen = 6;
@@ -191,10 +192,10 @@ rd_kafka_op_t *rd_kafka_op_new0 (const char *source, rd_kafka_op_type_t type) {
 
 #if ENABLE_DEVEL
         rko->rko_source = source;
+        rd_atomic32_add(&rd_kafka_op_cnt, 1);
 #endif
 
-        rd_atomic32_add(&rd_kafka_op_cnt, 1);
-	return rko;
+        return rko;
 }
 
 
@@ -304,8 +305,10 @@ void rd_kafka_op_destroy (rd_kafka_op_t *rko) {
 
 	rd_kafka_replyq_destroy(&rko->rko_replyq);
 
+#if ENABLE_DEVEL
         if (rd_atomic32_sub(&rd_kafka_op_cnt, 1) < 0)
                 rd_kafka_assert(NULL, !*"rd_kafka_op_cnt < 0");
+#endif
 
 	rd_free(rko);
 }
