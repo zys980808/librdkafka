@@ -79,7 +79,7 @@ static void rd_kafka_toppar_lag_handle_Offset (rd_kafka_t *rk,
         shptr_rd_kafka_toppar_t *s_rktp = opaque;
         rd_kafka_toppar_t *rktp = rd_kafka_toppar_s2i(s_rktp);
         rd_kafka_topic_partition_list_t *offsets;
-        rd_kafka_topic_partition_t *rktpar;
+        rd_kafka_topic_partition_t *rktpar = NULL; /* avoid msvc warning */
 
         offsets = rd_kafka_topic_partition_list_new(1);
 
