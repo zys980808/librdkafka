@@ -173,6 +173,7 @@ shptr_rd_kafka_toppar_t *rd_kafka_toppar_new0 (rd_kafka_itopic_t *rkt,
 	rktp->rktp_partition = partition;
 	rktp->rktp_rkt = rkt;
         rktp->rktp_leader_id = -1;
+        rd_atomic32_init(&rktp->rktp_leader_id_a, -1);
 	rktp->rktp_fetch_state = RD_KAFKA_TOPPAR_FETCH_NONE;
         rktp->rktp_fetch_msg_max_bytes
             = rkt->rkt_rk->rk_conf.fetch_msg_max_bytes;

@@ -71,6 +71,9 @@ struct rd_kafka_toppar_s { /* rd_kafka_toppar_t */
         int32_t            rktp_leader_id;   /**< Current leader broker id.
                                               *   This is updated directly
                                               *   from metadata. */
+        rd_atomic32_t      rktp_leader_id_a; /**< Atomically protected, rather
+                                              * than locked, verison of the
+                                              * above. */
 	rd_kafka_broker_t *rktp_leader;      /**< Current leader broker
                                               *   This updated asynchronously
                                               *   by issuing JOIN op to
@@ -416,6 +419,25 @@ void rd_kafka_toppar_offset_request (rd_kafka_toppar_t *rktp,
 rd_kafka_assignor_t *
 rd_kafka_assignor_find (rd_kafka_t *rk, const char *protocol);
 
+
+
+/**
+* @returns a partition's current cached leader (id),
+*          or -1 if not found or available
+* @locks rd_kafka_topic_*lock()
+*/
+static RD_INLINE RD_UNUSED
+int32_t rd_kafka_toppar_leader_id (const rd_kafka_itopic_t *rkt,
+                                   int32_t partition) {
+        rd_kafka_toppar_t *rktp;
+
+        if (unlikely(partition < 0 || partition >= rkt->rkt_partition_cnt))
+                return -1;
+
+        rktp = rd_kafka_toppar_s2i(rkt->rkt_p[partition]);
+
+        return rd_atomic32_get(&rktp->rktp_leader_id_a);
+}
 
 rd_kafka_broker_t *rd_kafka_toppar_leader (rd_kafka_toppar_t *rktp,
                                            int proper_broker);

@@ -387,6 +387,7 @@ int rd_kafka_toppar_leader_update (rd_kafka_toppar_t *rktp,
                              rktp->rktp_partition,
                              rktp->rktp_leader_id, leader_id);
                 rktp->rktp_leader_id = leader_id;
+                rd_atomic32_set(&rktp->rktp_leader_id_a, leader_id);
         }
 
 	if (!rkb) {
@@ -1155,23 +1156,8 @@ int rd_kafka_topic_scan_all (rd_kafka_t *rk, rd_ts_t now) {
  */
 int rd_kafka_topic_partition_available (const rd_kafka_topic_t *app_rkt,
 					int32_t partition) {
-	int avail;
-	shptr_rd_kafka_toppar_t *s_rktp;
-        rd_kafka_toppar_t *rktp;
-        rd_kafka_broker_t *rkb;
-
-	s_rktp = rd_kafka_toppar_get(rd_kafka_topic_a2i(app_rkt),
-                                     partition, 0/*no ua-on-miss*/);
-	if (unlikely(!s_rktp))
-		return 0;
-
-        rktp = rd_kafka_toppar_s2i(s_rktp);
-        rkb = rd_kafka_toppar_leader(rktp, 1/*proper broker*/);
-        avail = rkb ? 1 : 0;
-        if (rkb)
-                rd_kafka_broker_destroy(rkb);
-	rd_kafka_toppar_destroy(s_rktp);
-	return avail;
+        return rd_kafka_toppar_leader_id(rd_kafka_topic_a2i(app_rkt),
+                                         partition) != -1;
 }
 
 
