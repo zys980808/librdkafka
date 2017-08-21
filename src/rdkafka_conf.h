@@ -103,9 +103,10 @@ struct rd_kafka_conf_s {
 	char   *broker_version_fallback;
 	rd_kafka_secproto_t security_protocol;
 
-#if WITH_SSL
 	struct {
+#if WITH_SSL
 		SSL_CTX *ctx;
+#endif
 		char *cipher_suites;
 		char *key_location;
 		char *key_password;
@@ -113,7 +114,6 @@ struct rd_kafka_conf_s {
 		char *ca_location;
 		char *crl_location;
 	} ssl;
-#endif
 
         struct {
                 const struct rd_kafka_sasl_provider *provider;

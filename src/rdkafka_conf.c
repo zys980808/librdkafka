@@ -40,6 +40,56 @@
 #include "rdkafka_plugin.h"
 #endif
 
+
+/*
+ * Helpful error descriptions when a feature is unsupported.
+ */
+#ifdef _MSC_VER
+#define RD_KAFKA_PREBUILT_DESC "install the pre-built librdkafka.redist NuGet package (https://www.nuget.org/packages/librdkafka.redist/), or "
+#elif defined(__APPLE__)
+#define RD_KAFKA_PREBUILT_DESC "install the pre-built librdkafka Homebrew package, or "
+#elif defined(__linux__)
+#define RD_KAFKA_PREBUILT_DESC "install the pre-built librdkafka deb/rpm package available from http://docs.confluent.io/current/installation.html, or "
+#endif
+
+#define RD_KAFKA_SRCBUILD_DESC "build librdkafka from source (https://github.com/edenhill/librdkafka)"
+
+
+#if !WITH_SSL
+#define UNSUPPORTED_SSL_DESC                                            \
+        "This build of librdkafka lacks SSL support, "                  \
+        RD_KAFKA_PREBUILT_DESC RD_KAFKA_SRCBUILD_DESC                   \
+        " after installing the OpenSSL development files."
+#define UNSUPPORTED_SASL_SCRAM_DESC                                     \
+        "This build of librdkafka lacks SASL SCRAM support, "           \
+        RD_KAFKA_PREBUILT_DESC RD_KAFKA_SRCBUILD_DESC                   \
+        " after installing the OpenSSL development files."
+
+#else
+#define UNSUPPORTED_SSL_DESC NULL
+#define UNSUPPORTED_SASL_SCRAM_DESC NULL
+#endif
+
+#if !defined(_MSC_VER) && !defined(WITH_SASL_CYRUS)
+#define UNSUPPORTED_SASL_KERBEROS_DESC                                  \
+        "This build of librdkafka lacks SASL Kerberos support, " RD_KAFKA_PREBUILT_DESC RD_KAFKA_SRCBUILD_DESC \
+        " after installing the OpenSSL and Cyrus libsasl2 development files."
+#else
+#define UNSUPPORTED_SASL_KERBEROS_DESC NULL
+#endif
+
+#if !WITH_ZLIB
+#define UNSUPPORTED_ZLIB_DESC                                            \
+        "This build of librdkafka lacks gzip (zlib) support, "          \
+        RD_KAFKA_PREBUILT_DESC RD_KAFKA_SRCBUILD_DESC                   \
+        " after installing the zlib development files."
+#else
+#define UNSUPPORTED_ZLIB_DESC NULL
+#endif
+
+
+
+
 struct rd_kafka_property {
 	rd_kafka_conf_scope_t scope;
 	const char *name;
@@ -67,11 +117,21 @@ struct rd_kafka_property {
 	struct {
 		int val;
 		const char *str;
+                const char *unsupported; /* If non-NULL points to a string
+                                          * explaining why the value is not
+                                          * not supported (external dependency).
+                                          * Typically #ifdef-guarded */
 	} s2i[16];  /* _RK_C_S2I and _RK_C_S2F */
+
+        const char *unsupported; /* If non-NULL points to a string
+                                  * explaining why the value is not
+                                  * not supported (external dependency).
+                                  * Typically #ifdef-guarded */
 
 	/* Value validator (STR) */
 	int (*validate) (const struct rd_kafka_property *prop,
-			 const char *val, int ival);
+			 const char *val, int ival,
+                         char *errstr, size_t errstr_size);
 
         /* Configuration object constructors and destructor for use when
          * the property value itself is not used, or needs extra care. */
@@ -103,10 +163,18 @@ rd_kafka_anyconf_get0 (const void *conf, const struct rd_kafka_property *prop,
  */
 static int
 rd_kafka_conf_validate_broker_version (const struct rd_kafka_property *prop,
-				       const char *val, int ival) {
+                                       const char *val, int ival,
+                                       char *errstr, size_t errstr_size) {
 	struct rd_kafka_ApiVersion *apis;
 	size_t api_cnt;
-	return rd_kafka_get_legacy_ApiVersions(val, &apis, &api_cnt, NULL);
+	int r = rd_kafka_get_legacy_ApiVersions(val, &apis, &api_cnt, NULL);
+        if (!r)
+                rd_snprintf(errstr, errstr_size,
+                            "Invalid value for "
+                            "configuration property \"%s\": %s: "
+                            "unsupported broker version",
+                            prop->name, val);
+        return r;
 }
 
 /**
@@ -114,8 +182,51 @@ rd_kafka_conf_validate_broker_version (const struct rd_kafka_property *prop,
  */
 static RD_UNUSED int
 rd_kafka_conf_validate_single (const struct rd_kafka_property *prop,
-				const char *val, int ival) {
-	return !strchr(val, ',') && !strchr(val, ' ');
+                               const char *val, int ival,
+                               char *errstr, size_t errstr_size) {
+        int r = !strchr(val, ',') && !strchr(val, ' ');
+        if (!r)
+                rd_snprintf(errstr, errstr_size,
+                            "Invalid value for "
+                            "configuration property \"%s\": %s: "
+                            "only one item allow",
+                            prop->name, val);
+        return r;
+}
+
+/**
+ * @brief Validate sasl.mechanisms
+ */
+static RD_UNUSED int
+rd_kafka_conf_validate_sasl_mechanisms (const struct rd_kafka_property *prop,
+                                        const char *val, int ival,
+                                        char *errstr, size_t errstr_size) {
+        /* Only one mechanism is supported */
+        if (!rd_kafka_conf_validate_single(prop, val, ival,
+                                           errstr, errstr_size))
+                return 0;
+
+        if (!strncmp(val, "SCRAM", 5)) {
+#if !WITH_SASL_SCRAM
+                rd_snprintf(errstr, errstr_size,
+                            "Unsupported value for configuration property "
+                            "\"%s\": %s: %s",
+                            prop->name, val,
+                            UNSUPPORTED_SASL_SCRAM_DESC);
+                return 0;
+#endif
+        } else if (!rd_strcasecmp(val, "GSSAPI")) {
+#if !defined(_MSC_VER) && !defined(WITH_SASL_CYRUS)
+                rd_snprintf(errstr, errstr_size,
+                            "Unsupported value for configuration property "
+                            "\"%s\": %s: %s",
+                            prop->name, val,
+                            UNSUPPORTED_SASL_KERBEROS_DESC);
+                return 0;
+#endif
+        }
+
+        return 1;
 }
 
 
@@ -421,47 +532,55 @@ static const struct rd_kafka_property rd_kafka_properties[] = {
 	  .vdef = RD_KAFKA_PROTO_PLAINTEXT,
 	  .s2i = {
 			{ RD_KAFKA_PROTO_PLAINTEXT, "plaintext" },
-#if WITH_SSL
-			{ RD_KAFKA_PROTO_SSL, "ssl" },
+			{ RD_KAFKA_PROTO_SSL, "ssl"
+#if !WITH_SSL
+                          , .unsupported = UNSUPPORTED_SSL_DESC
 #endif
+                        },
 			{ RD_KAFKA_PROTO_SASL_PLAINTEXT, "sasl_plaintext" },
-#if WITH_SSL
-			{ RD_KAFKA_PROTO_SASL_SSL, "sasl_ssl" },
+			{ RD_KAFKA_PROTO_SASL_SSL, "sasl_ssl"
+#if !WITH_SSL
+                          , .unsupported = UNSUPPORTED_SSL_DESC
 #endif
+                        },
 			{ 0, NULL }
 		} },
 
-#if WITH_SSL
 	{ _RK_GLOBAL, "ssl.cipher.suites", _RK_C_STR,
 	  _RK(ssl.cipher_suites),
 	  "A cipher suite is a named combination of authentication, "
 	  "encryption, MAC and key exchange algorithm used to negotiate the "
 	  "security settings for a network connection using TLS or SSL network "
 	  "protocol. See manual page for `ciphers(1)` and "
-	  "`SSL_CTX_set_cipher_list(3)."
+	  "`SSL_CTX_set_cipher_list(3).",
+          .unsupported = UNSUPPORTED_SSL_DESC
 	},
 	{ _RK_GLOBAL, "ssl.key.location", _RK_C_STR,
 	  _RK(ssl.key_location),
-	  "Path to client's private key (PEM) used for authentication."
+	  "Path to client's private key (PEM) used for authentication.",
+          .unsupported = UNSUPPORTED_SSL_DESC
 	},
 	{ _RK_GLOBAL, "ssl.key.password", _RK_C_STR,
 	  _RK(ssl.key_password),
-	  "Private key passphrase"
+	  "Private key passphrase",
+          .unsupported = UNSUPPORTED_SSL_DESC
 	},
 	{ _RK_GLOBAL, "ssl.certificate.location", _RK_C_STR,
 	  _RK(ssl.cert_location),
-	  "Path to client's public key (PEM) used for authentication."
+	  "Path to client's public key (PEM) used for authentication.",
+          .unsupported = UNSUPPORTED_SSL_DESC
 	},
 	{ _RK_GLOBAL, "ssl.ca.location", _RK_C_STR,
 	  _RK(ssl.ca_location),
 	  "File or directory path to CA certificate(s) for verifying "
-	  "the broker's key."
+	  "the broker's key.",
+          .unsupported = UNSUPPORTED_SSL_DESC
 	},
 	{ _RK_GLOBAL, "ssl.crl.location", _RK_C_STR,
 	  _RK(ssl.crl_location),
-	  "Path to CRL for verifying broker's certificate validity."
+	  "Path to CRL for verifying broker's certificate validity.",
+          .unsupported = UNSUPPORTED_SSL_DESC
 	},
-#endif /* WITH_SSL */
 
 	{_RK_GLOBAL,"sasl.mechanisms", _RK_C_STR,
 	 _RK(sasl.mechanisms),
@@ -469,7 +588,7 @@ static const struct rd_kafka_property rd_kafka_properties[] = {
 	 "Supported: GSSAPI, PLAIN, SCRAM-SHA-256, SCRAM-SHA-512. "
 	 "**NOTE**: Despite the name only one mechanism must be configured.",
 	 .sdef = "GSSAPI",
-	 .validate = rd_kafka_conf_validate_single },
+	 .validate = rd_kafka_conf_validate_sasl_mechanisms },
 	{ _RK_GLOBAL, "sasl.kerberos.service.name", _RK_C_STR,
 	  _RK(sasl.service_name),
 	  "Kerberos principal name that Kafka runs as.",
@@ -680,9 +799,11 @@ static const struct rd_kafka_property rd_kafka_properties[] = {
 	  .vdef = RD_KAFKA_COMPRESSION_NONE,
 	  .s2i = {
 			{ RD_KAFKA_COMPRESSION_NONE,   "none" },
-#if WITH_ZLIB
-			{ RD_KAFKA_COMPRESSION_GZIP,   "gzip" },
+			{ RD_KAFKA_COMPRESSION_GZIP,   "gzip"
+#if !WITH_ZLIB
+                          , .unsupported = UNSUPPORTED_ZLIB_DESC
 #endif
+                        },
 #if WITH_SNAPPY
 			{ RD_KAFKA_COMPRESSION_SNAPPY, "snappy" },
 #endif
@@ -760,9 +881,11 @@ static const struct rd_kafka_property rd_kafka_properties[] = {
 	  .vdef = RD_KAFKA_COMPRESSION_INHERIT,
 	  .s2i = {
 		  { RD_KAFKA_COMPRESSION_NONE, "none" },
-#if WITH_ZLIB
-		  { RD_KAFKA_COMPRESSION_GZIP, "gzip" },
+		  { RD_KAFKA_COMPRESSION_GZIP, "gzip"
+#if !WITH_ZLIB
+                    .unsupported = UNSUPPORTED_ZLIB_DESC
 #endif
+                  },
 #if WITH_SNAPPY
 		  { RD_KAFKA_COMPRESSION_SNAPPY, "snappy" },
 #endif
@@ -874,7 +997,6 @@ rd_kafka_anyconf_set_prop0 (int scope, void *conf,
                 if (res != RD_KAFKA_CONF_UNKNOWN)
                         return res;
         }
-
 
         if (prop->set) {
                 /* Custom setter */
@@ -1007,6 +1129,15 @@ rd_kafka_anyconf_set_prop (int scope, void *conf,
 			   char *errstr, size_t errstr_size) {
 	int ival;
 
+        if (prop->unsupported) {
+                /* Unsupported setting in this build configuration */
+                rd_snprintf(errstr, errstr_size,
+                            "Unsupported value for configuration property "
+                            "\"%s\": %s: %s",
+                            prop->name, value, prop->unsupported);
+                return RD_KAFKA_CONF_INVALID;
+        }
+
 	switch (prop->type)
 	{
 	case _RK_C_STR:
@@ -1029,14 +1160,11 @@ rd_kafka_anyconf_set_prop (int scope, void *conf,
 		}
 		/* FALLTHRU */
         case _RK_C_PATLIST:
-		if (prop->validate &&
-		    (!value || !prop->validate(prop, value, -1))) {
-			rd_snprintf(errstr, errstr_size,
-				    "Invalid value for "
-				    "configuration property \"%s\": %s",
-				    prop->name, value);
-			return RD_KAFKA_CONF_INVALID;
-		}
+                if (prop->validate &&
+                    (!value || !prop->validate(prop, value, -1,
+                                               errstr, errstr_size))) {
+                        return RD_KAFKA_CONF_INVALID;
+                }
 
 		return rd_kafka_anyconf_set_prop0(scope, conf, prop, value, 0,
 						  _RK_CONF_PROP_SET_REPLACE,
@@ -1136,6 +1264,11 @@ rd_kafka_anyconf_set_prop (int scope, void *conf,
 			return RD_KAFKA_CONF_INVALID;
 		}
 
+                if (prop->validate &&
+                    (!value || !prop->validate(prop, value, -1,
+                                               errstr, errstr_size)))
+                        return RD_KAFKA_CONF_INVALID;
+
 		next = value;
 		while (next && *next) {
 			const char *s, *t;
@@ -1190,6 +1323,19 @@ rd_kafka_anyconf_set_prop (int scope, void *conf,
 					new_val = prop->s2i[j].val;
 				else
 					continue;
+
+                                if (prop->s2i[j].unsupported) {
+                                        /* Unsupported setting in this
+                                         * build configuration */
+                                        rd_snprintf(errstr, errstr_size,
+                                                    "Unsupported value for "
+                                                    "configuration property "
+                                                    "\"%s\": %s: %s",
+                                                    prop->name, value,
+                                                    prop->s2i[j].unsupported);
+                                        return RD_KAFKA_CONF_INVALID;
+                                }
+
 
 				rd_kafka_anyconf_set_prop0(scope, conf, prop,
                                                            value, new_val,
