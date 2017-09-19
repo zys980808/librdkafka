@@ -66,7 +66,7 @@ prepare_ubuntu:
 #	curl -sL -o /tmp/mock.deb 'https://launchpad.net/ubuntu/+source/mock/1.3.2-1/+build/11780212/+files/mock_1.3.2-1_all.deb'
 #	apt install -y /tmp/mock.deb
 #	apt install -y git python-six
-	apt install -y mock
-	sudo cp packaging/rpm/*.cfg /etc/mock/
+	apt-get install -y mock
+	cp *.cfg /etc/mock/
 	addgroup --system mock || true
 	adduser $$(whoami) mock
