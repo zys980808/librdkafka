@@ -67,5 +67,6 @@ prepare_ubuntu:
 #	apt install -y /tmp/mock.deb
 #	apt install -y git python-six
 	apt install -y mock
+	sudo cp packaging/rpm/*.cfg /etc/mock/
 	addgroup --system mock || true
 	adduser $$(whoami) mock
