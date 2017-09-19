@@ -45,6 +45,9 @@ rpm: srpm
 		--rebuild $(RESULT_DIR)/$(PACKAGE_NAME)*.src.rpm
 	@echo "======= Binary RPMs now available in $(RESULT_DIR) ======="
 
+copy-artifacts:
+	cp $(RESULT_DIR)/*rpm ../../artifacts/
+
 clean:
 	rm -rf SOURCES
 
