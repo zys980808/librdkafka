@@ -31,6 +31,7 @@ srpm: build_prepare
 		--define "__version $(VERSION)" \
 		--define "__release $(BUILD_NUMBER)" \
 		--resultdir=$(RESULT_DIR) \
+		--no-clean --no-cleanup-after \
 		--buildsrpm \
 		--spec=librdkafka.spec \
 		--sources=SOURCES
@@ -42,6 +43,7 @@ rpm: srpm
 		--define "__version $(VERSION)"\
 		--define "__release $(BUILD_NUMBER)"\
 		--resultdir=$(RESULT_DIR) \
+		--no-clean --no-cleanup-after \
 		--rebuild $(RESULT_DIR)/$(PACKAGE_NAME)*.src.rpm
 	@echo "======= Binary RPMs now available in $(RESULT_DIR) ======="
 
@@ -50,6 +52,7 @@ copy-artifacts:
 
 clean:
 	rm -rf SOURCES
+	/usr/bin/mock -r $(MOCK_CONFIG) --clean
 
 distclean: clean
 	rm -f build.log root.log state.log available_pkgs installed_pkgs \
@@ -60,13 +63,17 @@ distclean: clean
 #    so we copy it there.
 #  - add a mock system group (if not already exists)
 #  - add the current user to the mock group.
+#  - prepare mock environment with some needed packages.
 # NOTE: This target should be run with sudo.
 prepare_ubuntu:
 	apt-get -qq update
-#	curl -sL -o /tmp/mock.deb 'https://launchpad.net/ubuntu/+source/mock/1.3.2-1/+build/11780212/+files/mock_1.3.2-1_all.deb'
-#	apt install -y /tmp/mock.deb
-#	apt install -y git python-six
-	apt-get install -y mock
+	apt-get install -y -qq mock make git python-lzma
 	cp *.cfg /etc/mock/
 	addgroup --system mock || true
 	adduser $$(whoami) mock
+	/usr/bin/mock -r $(MOCK_CONFIG) --init
+	/usr/bin/mock -r $(MOCK_CONFIG) --no-cleanup-after --install epel-release shadow-utils
+
+prepare_centos:
+	yum install -y -q mock make git
+	cp *.cfg /etc/mock/
