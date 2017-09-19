@@ -30,7 +30,7 @@ deploy:
   region: us-west-1
   skip_cleanup: true
   local-dir: artifacts
-  upload-dir: librdkafka/p-librdkafka__bld-travis__plat-${TRAVIS_OS_NAME}__arch-${ARCH}__tag-${TRAVIS}__sha-${TRAVIS_COMMIT}__bid-${TRAVIS_BUILD_ID}
+  upload-dir: librdkafka/p-librdkafka__bld-travis__plat-${TRAVIS_OS_NAME}__arch-${ARCH}__tag-${TRAVIS_TAG}__sha-${TRAVIS_COMMIT}__bid-${TRAVIS_JOB_NUMBER}
   on:
     condition: "$CC = gcc"
     repo: edenhill/librdkafka
