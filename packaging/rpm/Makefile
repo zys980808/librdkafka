@@ -4,7 +4,7 @@ VERSION?=	$(shell ../get_version.py ../../src/rdkafka.h)
 # Jenkins CI integration
 BUILD_NUMBER?= 1
 
-MOCK_CONFIG?=el7-x86_64.cfg
+MOCK_CONFIG?=el7-x86_64
 
 RESULT_DIR?=pkgs-$(VERSION)-$(BUILD_NUMBER)-$(MOCK_CONFIG)
 
