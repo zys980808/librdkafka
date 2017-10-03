@@ -2810,7 +2810,18 @@ static void rd_kafka_broker_fetch_reply (rd_kafka_t *rk,
 
 		rd_kafka_broker_fetch_backoff(rkb, err);
 		/* FALLTHRU */
-	}
+
+        } else {
+                /* Loose buffer -> broker reference to avoid
+                 * hang-on-termination if application does not return
+                 * all messages prior to calling destructor.
+                 * Now instead of hanging the application will leak some
+                 * memory instead. */
+                if (reply->rkbuf_rkb) {
+                        rd_kafka_broker_destroy(reply->rkbuf_rkb);
+                        reply->rkbuf_rkb = NULL;
+                }
+        }
 }
 
 
