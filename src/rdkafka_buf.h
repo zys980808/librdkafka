@@ -542,7 +542,7 @@ void rd_kafka_bufq_purge (rd_kafka_broker_t *rkb,
 void rd_kafka_bufq_connection_reset (rd_kafka_broker_t *rkb,
 				     rd_kafka_bufq_t *rkbufq);
 void rd_kafka_bufq_dump (rd_kafka_broker_t *rkb, const char *fac,
-			 rd_kafka_bufq_t *rkbq);
+			 rd_kafka_bufq_t *rkbq, int max_cnt);
 
 int rd_kafka_buf_retry (rd_kafka_broker_t *rkb, rd_kafka_buf_t *rkbuf);
 

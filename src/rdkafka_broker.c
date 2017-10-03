@@ -422,13 +422,19 @@ void rd_kafka_broker_fail (rd_kafka_broker_t *rkb,
 	 * show what is keeping this broker from decommissioning. */
 	if (rd_kafka_terminating(rkb->rkb_rk) &&
 	    !rd_kafka_broker_terminating(rkb)) {
-		rd_rkb_dbg(rkb, BROKER | RD_KAFKA_DBG_PROTOCOL, "BRKTERM",
-			   "terminating: broker still has %d refcnt(s), "
-			   "%"PRId32" buffer(s), %d partition(s)",
-			   rd_refcnt_get(&rkb->rkb_refcnt),
-			   rd_kafka_bufq_cnt(&rkb->rkb_outbufs),
-			   rkb->rkb_toppar_cnt);
-		rd_kafka_bufq_dump(rkb, "BRKOUTBUFS", &rkb->rkb_outbufs);
+                rd_rkb_dbg(rkb, BROKER | RD_KAFKA_DBG_PROTOCOL, "BRKTERM",
+                           "terminating in state %s: broker still has "
+                           "%d refcnts, %d toppar(s), %d fetch toppar(s), "
+                           "%d outbufs, %d waitresps, %d retrybufs",
+                           rd_kafka_broker_state_names[rkb->rkb_state],
+                           rd_refcnt_get(&rkb->rkb_refcnt),
+                           rkb->rkb_toppar_cnt, rkb->rkb_fetch_toppar_cnt,
+                           (int)rd_kafka_bufq_cnt(&rkb->rkb_outbufs),
+                           (int)rd_kafka_bufq_cnt(&rkb->rkb_waitresps),
+                           (int)rd_kafka_bufq_cnt(&rkb->rkb_retrybufs));
+                rd_kafka_bufq_dump(rkb, "BRKOUTBUFS", &rkb->rkb_outbufs, 10);
+                rd_kafka_bufq_dump(rkb, "BRKWTRESPS", &rkb->rkb_waitresps, 10);
+                rd_kafka_bufq_dump(rkb, "BRKRTRBUFS", &rkb->rkb_retrybufs, 10);
 #if ENABLE_SHAREDPTR_DEBUG
 		if (rd_refcnt_get(&rkb->rkb_refcnt) > 1) {
 			rd_rkb_dbg(rkb, BROKER, "BRKTERM",

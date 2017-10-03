@@ -276,10 +276,11 @@ void rd_kafka_bufq_connection_reset (rd_kafka_broker_t *rkb,
 
 
 void rd_kafka_bufq_dump (rd_kafka_broker_t *rkb, const char *fac,
-			 rd_kafka_bufq_t *rkbq) {
+                         rd_kafka_bufq_t *rkbq, int max_cnt) {
 	rd_kafka_buf_t *rkbuf;
 	int cnt = rd_kafka_bufq_cnt(rkbq);
 	rd_ts_t now;
+        int i = 0;
 
 	if (!cnt)
 		return;
@@ -289,6 +290,11 @@ void rd_kafka_bufq_dump (rd_kafka_broker_t *rkb, const char *fac,
 	rd_rkb_dbg(rkb, BROKER, fac, "bufq with %d buffer(s):", cnt);
 
 	TAILQ_FOREACH(rkbuf, &rkbq->rkbq_bufs, rkbuf_link) {
+                if (i++ == max_cnt) {
+                        rd_rkb_dbg(rkb, BROKER, fac,
+                                   " .. and %d more", (cnt-i));
+                        break;
+                }
 		rd_rkb_dbg(rkb, BROKER, fac,
 			   " Buffer %s (%"PRIusz" bytes, corrid %"PRId32", "
 			   "connid %d, retry %d in %lldms, timeout in %lldms",
