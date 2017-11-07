@@ -97,7 +97,7 @@ $(LIBFILENAMELINK): $(LIBFILENAME)
 	rm -f "$@" && ln -s "$^" "$@"
 
 
-# pkg-config .pc file definition
+# pkg-config .pc file definition for dynamic library
 ifeq ($(GEN_PKG_CONFIG),y)
 define _PKG_CONFIG_DEF
 prefix=$(prefix)
@@ -114,14 +114,33 @@ endef
 
 export _PKG_CONFIG_DEF
 
+# pkg-config .pc file definition for static library
+define _PKG_CONFIG_STATIC_DEF
+prefix=$(prefix)
+libdir=$(libdir)
+includedir=$(includedir)
+
+Name: $(LIBNAME)-static
+Description: $(MKL_APP_DESC_ONELINE) (static)
+Version: $(MKL_APP_VERSION)
+Cflags: -I$${includedir}
+Libs: -L$${libdir} $${libdir}/$(LIBNAME).a $(patsubst -L%,,$(LIBS))
+endef
+
+export _PKG_CONFIG_STATIC_DEF
+
 $(LIBNAME0).pc: $(TOPDIR)/Makefile.config
 	@printf "$(MKL_YELLOW)Generating pkg-config file $@$(MKL_CLR_RESET)\n"
 	@echo "$$_PKG_CONFIG_DEF" > $@
 
-lib-gen-pkg-config: $(LIBNAME0).pc
+$(LIBNAME0)-static.pc: $(TOPDIR)/Makefile.config
+	@printf "$(MKL_YELLOW)Generating static pkg-config file $@$(MKL_CLR_RESET)\n"
+	@echo "$$_PKG_CONFIG_STATIC_DEF" > $@
+
+lib-gen-pkg-config: $(LIBNAME0).pc $(LIBNAME0)-static.pc
 
 lib-clean-pkg-config:
-	rm -f $(LIBNAME0).pc
+	rm -f $(LIBNAME0).pc $(LIBNAME0)-static.pc
 else
 lib-gen-pkg-config:
 lib-clean-pkg-config:
@@ -157,7 +176,7 @@ lib-install:
 	$(INSTALL) $(LIBFILENAME) $$DESTDIR$(libdir) ; \
 	[ -f "$(LIBNAME0).pc" ] && ( \
 		$(INSTALL) -d $$DESTDIR$(pkgconfigdir) ; \
-		$(INSTALL) -m 0644 $(LIBNAME0).pc $$DESTDIR$(pkgconfigdir) \
+		$(INSTALL) -m 0644 $(LIBNAME0).pc $(LIBNAME0)-static.pc $$DESTDIR$(pkgconfigdir) \
 	) ; \
 	(cd $$DESTDIR$(libdir) && ln -sf $(LIBFILENAME) $(LIBFILENAMELINK))
 
