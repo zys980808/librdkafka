@@ -53,6 +53,35 @@ typedef struct rd_kafka_sasl_cyrus_state_s {
 } rd_kafka_sasl_cyrus_state_t;
 
 
+/**
+ * @brief Populate \p errstr with authentication failure reason.
+ *
+ * @param where is the context where it failed (for devel debugging purposes)
+ */
+static void
+rd_kafka_sasl_auth_fail_errstr (struct rd_kafka_transport_s *rktrans,
+                                const char *where,
+                                char *errstr, size_t errstr_size) {
+        rd_kafka_sasl_cyrus_state_t *state = rktrans->rktrans_sasl.state;
+        const char *user, *mech, *authsrc;
+
+        if (sasl_getprop(state->conn, SASL_USERNAME,
+                         (const void **)&user) != SASL_OK)
+                user = "(unknown)";
+
+        if (sasl_getprop(state->conn, SASL_MECHNAME,
+                         (const void **)&mech) != SASL_OK)
+                mech = "(unknown)";
+
+        if (sasl_getprop(state->conn, SASL_AUTHSOURCE,
+                         (const void **)&authsrc) != SASL_OK)
+                authsrc = "(unknown)";
+
+        rd_snprintf(errstr, errstr_size,
+                    "SASL handshake %s failed for %s using "
+                    "mechanism %s (%s): %s",
+                    where, user, mech, authsrc, sasl_errdetail(state->conn));
+}
 
 /**
  * Handle received frame from broker.
@@ -97,9 +126,8 @@ static int rd_kafka_sasl_cyrus_recv (struct rd_kafka_transport_s *rktrans,
         if (r == SASL_CONTINUE)
                 return 0;  /* Wait for more data from broker */
         else if (r != SASL_OK) {
-                rd_snprintf(errstr, errstr_size,
-                            "SASL handshake failed (step): %s",
-                            sasl_errdetail(state->conn));
+                rd_kafka_sasl_auth_fail_errstr(rktrans, "step",
+                                               errstr, errstr_size);
                 return -1;
         }
 
@@ -425,6 +453,7 @@ static int rd_kafka_sasl_cyrus_client_new (rd_kafka_transport_t *rktrans,
         rd_kafka_sasl_cyrus_state_t *state;
         rd_kafka_broker_t *rkb = rktrans->rktrans_rkb;
         rd_kafka_t *rk = rkb->rkb_rk;
+        char selected_mech[32];
         sasl_callback_t callbacks[16] = {
                 // { SASL_CB_GETOPT, (void *)rd_kafka_sasl_cyrus_cb_getopt, rktrans },
                 { SASL_CB_LOG, (void *)rd_kafka_sasl_cyrus_cb_log, rktrans },
@@ -476,14 +505,29 @@ static int rd_kafka_sasl_cyrus_client_new (rd_kafka_transport_t *rktrans,
                            "My supported SASL mechanisms: %s", avail_mechs);
         }
 
+        *selected_mech = '\0';
+
         do {
                 const char *out;
                 unsigned int outlen;
                 const char *mech = NULL;
+                const char *selmech;
 
                 r = sasl_client_start(state->conn,
                                       rk->rk_conf.sasl.mechanisms,
                                       NULL, &out, &outlen, &mech);
+
+                /* Debug-log the selected mechanism (once) */
+                if (sasl_getprop(state->conn, SASL_MECHNAME,
+                                 (const void **)&selmech) == SASL_OK &&
+                    selmech && strcmp(selmech, selected_mech)) {
+                        rd_rkb_dbg(rkb, SECURITY, "SASL",
+                                   "Selected %sSASL mechanism: %s (wanted %s)",
+                                   *selected_mech ? "new ": "",
+                                   selmech, rk->rk_conf.sasl.mechanisms);
+                        rd_snprintf(selected_mech, sizeof(selected_mech),
+                                    "%s", selmech);
+                }
 
                 if (r >= 0)
                         if (rd_kafka_sasl_send(rktrans, out, outlen,
@@ -499,9 +543,8 @@ static int rd_kafka_sasl_cyrus_client_new (rd_kafka_transport_t *rktrans,
                 return 0;
 
         } else if (r != SASL_CONTINUE) {
-                rd_snprintf(errstr, errstr_size,
-                            "SASL handshake failed (start (%d)): %s",
-                            r, sasl_errdetail(state->conn));
+                rd_kafka_sasl_auth_fail_errstr(rktrans, "start",
+                                               errstr, errstr_size);
                 return -1;
         }
 
