@@ -68,6 +68,7 @@
 #if WITH_SSL
 static mtx_t *rd_kafka_ssl_locks;
 static int    rd_kafka_ssl_locks_cnt;
+static ENGINE *rd_kafka_ssl_rand_eng;
 #endif
 
 
@@ -452,6 +453,12 @@ static unsigned long rd_kafka_transport_ssl_threadid_cb (void) {
 void rd_kafka_transport_ssl_term (void) {
 	int i;
 
+        if (rd_kafka_ssl_rand_eng) {
+                ENGINE_finish(rd_kafka_ssl_rand_eng);
+                ENGINE_free(rd_kafka_ssl_rand_eng);
+                rd_kafka_ssl_rand_eng = NULL;
+        }
+
 	CRYPTO_set_id_callback(NULL);
 	CRYPTO_set_locking_callback(NULL);
         CRYPTO_cleanup_all_ex_data();
@@ -469,7 +476,24 @@ void rd_kafka_transport_ssl_term (void) {
  */
 void rd_kafka_transport_ssl_init (void) {
 	int i;
-	
+
+#if WITH_LIBSSL_RDRAND
+        /* Use a hardware random number generator if available. */
+        OPENSSL_cpuid_setup();
+        ENGINE_load_rdrand();
+
+        rd_kafka_ssl_rand_eng = ENGINE_by_id("rdrand");
+
+        if (rd_kafka_ssl_rand_eng) {
+                if (!ENGINE_init(rd_kafka_ssl_rand_eng) ||
+                    !ENGINE_set_default(rd_kafka_ssl_rand_eng,
+                                        ENGINE_METHOD_RAND)) {
+                        /* No runtime support */
+                        rd_kafka_ssl_rand_eng = NULL;
+                }
+        }
+#endif
+
 	rd_kafka_ssl_locks_cnt = CRYPTO_num_locks();
 	rd_kafka_ssl_locks = rd_malloc(rd_kafka_ssl_locks_cnt *
 				       sizeof(*rd_kafka_ssl_locks));

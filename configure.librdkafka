@@ -66,6 +66,18 @@ function checks {
         fi
 	mkl_lib_check "libssl" "WITH_SSL" disable CC "-lssl" \
                       "#include <openssl/ssl.h>"
+
+        if [[ $WITH_SSL == y ]]; then
+            # Check for hardware random number generator support (in OpenSSL)
+            mkl_compile_check "libssl_rdrand" "WITH_SSL_RDRAND" disable CC \
+"#include <openssl/ssl.h>
+
+void foo (void) {
+  OPENSSL_cpuid_setup();
+  ENGINE_load_rdrand();
+}
+"
+        fi
     fi
 
     if [[ "$ENABLE_SASL" == "y" ]]; then
