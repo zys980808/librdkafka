@@ -47,6 +47,7 @@ int main_0015_offsets_seek (int argc, char **argv) {
 	uint64_t testid;
 	int dance_iterations = 10;
 	int msgs_per_dance = 10;
+        rd_kafka_resp_err_t err;
 
 	testid = test_id_generate();
 
@@ -92,6 +93,14 @@ int main_0015_offsets_seek (int argc, char **argv) {
 					 (int)(offset_last - offset)),
 				  1 /* parse format */);
 	}
+
+        /* Verify fix for crash when timeout is 0 and infinite */
+        err = rd_kafka_seek(rkt_c, partition, RD_KAFKA_OFFSET_BEGINNING, 0);
+        TEST_ASSERT(!err, "seek failed: %s", rd_kafka_err2str(err));
+
+        err = rd_kafka_seek(rkt_c, partition, RD_KAFKA_OFFSET_END, -1);
+        TEST_ASSERT(!err, "seek failed: %s", rd_kafka_err2str(err));
+
 
 	test_consumer_stop("1", rkt_c, partition);
 

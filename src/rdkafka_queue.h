@@ -573,12 +573,14 @@ uint64_t rd_kafka_q_size (rd_kafka_q_t *rkq) {
 /* Construct temporary on-stack replyq with increased Q refcount and
  * optional VERSION. */
 #if ENABLE_DEVEL
-#define RD_KAFKA_REPLYQ(Q,VERSION) \
-	(rd_kafka_replyq_t){rd_kafka_q_keep(Q), VERSION, \
-			rd_strdup(__FUNCTION__) }
+#define RD_KAFKA_REPLYQ(Q,VERSION)                                      \
+        ((Q) ? ((rd_kafka_replyq_t){rd_kafka_q_keep(Q), VERSION,        \
+                                rd_strdup(__FUNCTION__) }) :            \
+         RD_KAFKA_NO_REPLYQ)
 #else
-#define RD_KAFKA_REPLYQ(Q,VERSION) \
-	(rd_kafka_replyq_t){rd_kafka_q_keep(Q), VERSION}
+#define RD_KAFKA_REPLYQ(Q,VERSION)                                      \
+        ((Q) ? ((rd_kafka_replyq_t){rd_kafka_q_keep(Q), VERSION}) :     \
+         RD_KAFKA_NO_REPLYQ)
 #endif
 
 /* Construct temporary on-stack replyq for indicating no replyq. */
