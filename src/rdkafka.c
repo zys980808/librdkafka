@@ -311,7 +311,7 @@ void rd_kafka_set_log_level (rd_kafka_t *rk, int level) {
 
 
 
-static const char *rd_kafka_type2str (rd_kafka_type_t type) {
+const char *rd_kafka_type2str (rd_kafka_type_t type) {
 	static const char *types[] = {
 		[RD_KAFKA_PRODUCER] = "producer",
 		[RD_KAFKA_CONSUMER] = "consumer",
@@ -1956,7 +1956,8 @@ rd_kafka_t *rd_kafka_new (rd_kafka_type_t type, rd_kafka_conf_t *app_conf,
                      rk->rk_name,
                      rk->rk_conf.builtin_features, rk->rk_conf.debug);
 
-        rd_kafka_conf_warn_deprecated(rk);
+        /* Warn about deprecated and non-applicable configuration properties */
+        rd_kafka_conf_warn(rk);
 
 	return rk;
 

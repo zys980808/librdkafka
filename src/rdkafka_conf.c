@@ -2929,49 +2929,75 @@ const char *rd_kafka_topic_conf_finalize (rd_kafka_type_t cltype,
 
 
 /**
- * @brief Log warnings for set deprecated configuration properties
+ * @brief Log warnings for deprecated or non-applicable
+ *        configuration properties.
  * @returns the number of warnings logged.
  */
-static int rd_kafka_anyconf_warn_deprecated (rd_kafka_t *rk,
-                                             rd_kafka_conf_scope_t scope,
-                                             const void *conf) {
+static int rd_kafka_anyconf_warn (rd_kafka_t *rk,
+                                  rd_kafka_conf_scope_t scope,
+                                  const void *conf) {
         const struct rd_kafka_property *prop;
         int cnt = 0;
-
-        scope |= _RK_DEPRECATED;
+        const int wrong_type_scope = rk->rk_type == RD_KAFKA_PRODUCER ?
+                _RK_CONSUMER : _RK_PRODUCER;
 
         for (prop = rd_kafka_properties; prop->name ; prop++) {
-                if (likely((prop->scope & scope) != scope))
+                if (likely(!(prop->scope & scope) ||
+                           !rd_kafka_anyconf_is_modified(conf, prop)))
                         continue;
 
-                if (likely(!rd_kafka_anyconf_is_modified(conf, prop)))
-                        continue;
+                if (unlikely((prop->scope & (_RK_CONSUMER|_RK_PRODUCER)) ==
+                             wrong_type_scope)) {
+                        rd_kafka_log(rk, LOG_WARNING, "CONFTYPE",
+                                     "Configuration property %s "
+                                     "is not applicable to %s instances",
+                                     prop->name,
+                                     rd_kafka_type2str(rk->rk_type));
+                        cnt++;
 
-                rd_kafka_log(rk, LOG_WARNING, "DEPRECATED",
-                             "Configuration property %s is deprecated: %s",
-                             prop->name, prop->desc);
-                cnt++;
+                } else if (unlikely(prop->scope & _RK_DEPRECATED)) {
+                        rd_kafka_log(rk, LOG_WARNING, "DEPRECATED",
+                                     "Configuration property %s is "
+                                     "deprecated: %s",
+                                     prop->name, prop->desc);
+                        cnt++;
+                }
+        }
+
+        /* Special handling */
+        if (rk->rk_type == RD_KAFKA_PRODUCER && (scope & _RK_TOPIC)) {
+                const rd_kafka_topic_conf_t *tconf = conf;
+
+                if (tconf->required_acks == 0) {
+                        rd_kafka_log(rk, LOG_WARNING, "REQACKS",
+                                     "Setting configuration property acks to "
+                                     "0 risks silent data-loss and is "
+                                     "strongly discouraged");
+                        cnt++;
+                }
         }
 
         return cnt;
 }
 
-
 /**
- * @brief Log warnings for set deprecated configuration properties.
+ * @brief Log warnings for deprecated or otherwise undesired
+ *        configuration properties.
+ *        These warnings are likely to be turned into errors in
+ *        future versions.
  *
  * @returns the number of warnings logged.
  *
  * @locality any
  * @locks none
  */
-int rd_kafka_conf_warn_deprecated (rd_kafka_t *rk) {
+int rd_kafka_conf_warn (rd_kafka_t *rk) {
         int cnt = 0;
 
-        cnt = rd_kafka_anyconf_warn_deprecated(rk, _RK_GLOBAL, &rk->rk_conf);
+        cnt = rd_kafka_anyconf_warn(rk, _RK_GLOBAL, &rk->rk_conf);
         if (rk->rk_conf.topic_conf)
-                cnt += rd_kafka_anyconf_warn_deprecated(
-                        rk, _RK_TOPIC, rk->rk_conf.topic_conf);
+                cnt += rd_kafka_anyconf_warn(rk, _RK_TOPIC,
+                                             rk->rk_conf.topic_conf);
 
         return cnt;
 }

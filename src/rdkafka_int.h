@@ -656,6 +656,8 @@ rd_kafka_app_polled (rd_kafka_t *rk) {
 }
 
 
+const char *rd_kafka_type2str (rd_kafka_type_t type);
+
 /**
  * rdkafka_background.c
  */

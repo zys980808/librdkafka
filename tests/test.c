@@ -704,8 +704,8 @@ void test_conf_init (rd_kafka_conf_t **conf, rd_kafka_topic_conf_t **topic_conf,
         if (conf) {
                 *conf = rd_kafka_conf_new();
                 rd_kafka_conf_set(*conf, "client.id", test_curr->name, NULL, 0);
-                test_conf_set(*conf, "enable.idempotence",
-                              test_idempotent_producer ? "true" : "false");
+                if (test_idempotent_producer)
+                        test_conf_set(*conf, "enable.idempotence", "true");
                 rd_kafka_conf_set_error_cb(*conf, test_error_cb);
                 rd_kafka_conf_set_stats_cb(*conf, test_stats_cb);
 
