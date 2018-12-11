@@ -685,8 +685,8 @@ rd_kafka_rebalance_op (rd_kafka_cgrp_t *rkcg,
 
 	if (!(rkcg->rkcg_rk->rk_conf.enabled_events & RD_KAFKA_EVENT_REBALANCE)
 	    || !assignment
-            || rd_kafka_destroy_flags_no_consumer_close(rkcg->rkcg_rk)) {
-	no_delegation:
+            || rd_kafka_destroy_flags_no_consumer_close(rkcg->rkcg_rk)
+            || !rd_kafka_q_ready(rkcg->rkcg_q)) {
 		if (err == RD_KAFKA_RESP_ERR__ASSIGN_PARTITIONS)
 			rd_kafka_cgrp_assign(rkcg, assignment);
 		else
@@ -712,11 +712,17 @@ rd_kafka_rebalance_op (rd_kafka_cgrp_t *rkcg,
 	rko->rko_err = err;
 	rko->rko_u.rebalance.partitions =
 		rd_kafka_topic_partition_list_copy(assignment);
+        /* Set the cgrp ops queue as the reply queue
+         * so that if this op ends up on a rejected queue (and thus
+         * no rebalance_cb served) we'll get an op back so we
+         * can perform the assign automatically. */
+        rd_kafka_op_set_replyq(rko, rkcg->rkcg_ops, NULL);
 
-	if (rd_kafka_q_enq(rkcg->rkcg_q, rko) == 0) {
-		/* Queue disabled, handle assignment here. */
-		goto no_delegation;
-	}
+        /* Keep a copy of the error since rko_err will be overwritten
+         * with ERR__DESTROY if the queue was disabled. */
+        rko->rko_u.rebalance.err = err;
+
+        rd_kafka_q_enq(rkcg->rkcg_q, rko);
 
 	return 1;
 }
@@ -3076,6 +3082,28 @@ rd_kafka_cgrp_op_serve (rd_kafka_t *rk, rd_kafka_q_t *rkq,
         case RD_KAFKA_OP_TERMINATE:
                 rd_kafka_cgrp_terminate0(rkcg, rko);
                 rko = NULL; /* terminate0() takes ownership */
+                break;
+
+        case RD_KAFKA_OP_REBALANCE|RD_KAFKA_OP_REPLY:
+                /* Designation of rebalance to application
+                 * failed due to the target queue being disabled.
+                 * Handle the assignment automatically here
+                 * to make sure the next state transition is made. */
+                rd_kafka_dbg(rkcg->rkcg_rk, CGRP, "ASSIGN",
+                             "Group \"%s\": handling %s of %d partition(s) "
+                             "due to application destination queue "
+                             "no longer available",
+                             rkcg->rkcg_group_id->str,
+                             rko->rko_err ==
+                             RD_KAFKA_RESP_ERR__REVOKE_PARTITIONS ?
+                             "revoke":"assign",
+                             rko->rko_u.rebalance.partitions->cnt);
+                if (rko->rko_u.rebalance.err ==
+                    RD_KAFKA_RESP_ERR__ASSIGN_PARTITIONS)
+                        rd_kafka_cgrp_assign(rkcg,
+                                             rko->rko_u.rebalance.partitions);
+                else
+                        rd_kafka_cgrp_unassign(rkcg);
                 break;
 
         default:

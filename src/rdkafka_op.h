@@ -274,6 +274,7 @@ struct rd_kafka_op_s {
 
 		struct {
 			rd_kafka_topic_partition_list_t *partitions;
+                        rd_kafka_resp_err_t err;
 		} rebalance;
 
 		struct {
