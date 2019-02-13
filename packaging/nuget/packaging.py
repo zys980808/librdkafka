@@ -309,8 +309,10 @@ class NugetPackage (Package):
             [{'arch': 'x64', 'plat': 'linux', 'fname_glob': 'librdkafka-debian9.tgz'}, './lib/librdkafka.so.1', 'runtimes/linux-x64/native/debian9-librdkafka.so'],
             # Travis Ubuntu 14.04 build
             [{'arch': 'x64', 'plat': 'linux', 'fname_glob': 'librdkafka.tar.gz'}, './lib/librdkafka.so.1', 'runtimes/linux-x64/native/librdkafka.so'],
-            # Travis CentOS RPM build
+            # Travis CentOS 7 RPM build
             [{'arch': 'x64', 'plat': 'linux', 'fname_glob': 'librdkafka1*.x86_64.rpm'}, './usr/lib64/librdkafka.so.1', 'runtimes/linux-x64/native/centos7-librdkafka.so'],
+            # Alpine build
+            [{'arch': 'x64', 'plat': 'linux', 'fname_glob': 'alpine-librdkafka.tgz'}, 'librdkafka.so.1', 'runtimes/linux-x64/native/alpine-librdkafka.so'],
 
             # Common Win runtime
             [{'arch': 'x64', 'plat': 'win', 'fname_glob': 'msvcr120.zip'}, 'msvcr120.dll', 'runtimes/win-x64/native/msvcr120.dll'],
@@ -400,7 +402,9 @@ class NugetPackage (Package):
             "build/native/lib/win/x64/win-x64-Release/v120/librdkafkacpp.lib",
             "build/native/lib/win/x86/win-x86-Release/v120/librdkafka.lib",
             "build/native/lib/win/x86/win-x86-Release/v120/librdkafkacpp.lib",
+            "runtimes/linux-x64/native/centos7-librdkafka.so",
             "runtimes/linux-x64/native/debian9-librdkafka.so",
+            "runtimes/linux-x64/native/alpine-librdkafka.so",
             "runtimes/linux-x64/native/librdkafka.so",
             "runtimes/osx-x64/native/librdkafka.dylib",
             "runtimes/win-x64/native/librdkafka.dll",
