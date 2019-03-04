@@ -10,7 +10,6 @@
 #   mkl_check libssl [<action>]
 #
 
-
 mkl_toggle_option "Feature" ENABLE_SSL "--enable-ssl" "Enable SSL support" "y"
 
 
@@ -53,7 +52,7 @@ if [[ $MKL_DISTRO != osx ]]; then
     function install_source {
         local name=$1
         local destdir=$2
-        local ver=1.0.2q
+        local ver=1.0.2r
 
         local conf_args="--openssldir=/usr/lib/ssl zlib shared"
         if [[ $ver == 1.0.* ]]; then
