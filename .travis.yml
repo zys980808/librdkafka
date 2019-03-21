@@ -15,7 +15,7 @@ before_script:
 script:
 - rm -rf artifacts dest
 - mkdir dest artifacts
-- if [[ "${TRAVIS_OS_NAME}_${CC}" == "osx_gcc" ]]; then brew install zstd ; fi
+#- if [[ "${TRAVIS_OS_NAME}_${CC}" == "osx_gcc" ]]; then brew install zstd ; fi
 - if [[ "${TRAVIS_OS_NAME}_${CC}" == "osx_clang" ]]; then ./configure --install-deps --disable-lz4-ext --prefix="$PWD/dest" --enable-static ; else ./configure --install-deps --disable-lz4-ext --prefix="$PWD/dest" ; fi
 - make -j2 all examples check && make -C tests run_local
 - make install
