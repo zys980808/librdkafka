@@ -3505,8 +3505,21 @@ static int rd_kafka_broker_thread_main (void *arg) {
 				rd_kafka_broker_set_state(rkb,
 							  RD_KAFKA_BROKER_STATE_UP);
                                 rd_kafka_broker_unlock(rkb);
-				break;
-			}
+                                break;
+                        }
+
+                        if (unlikely(rd_kafka_terminating(rkb->rkb_rk)))
+                                rd_kafka_broker_serve(rkb, 1000);
+
+                        if (!rd_kafka_sasl_ready(rkb->rkb_rk)) {
+                                /* SASL provider not yet ready. */
+                                rd_kafka_broker_serve(rkb,
+                                                      rd_kafka_max_block_ms);
+                                /* Continue while loop to try again (as long as
+                                 * we are not terminating). */
+                                continue;
+                        }
+>>>>>>> b6db4067... Refactor SASL framework for generic init/term/ready (and changed OAUTHBEARER to use)
 
                         /* Throttle & jitter reconnects to avoid
                          * thundering horde of reconnecting clients after

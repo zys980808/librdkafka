@@ -257,6 +257,11 @@ struct rd_kafka_s {
                                    *   This can be used for troubleshooting
                                    *   purposes. */
         } rk_background;
+
+        struct {
+                void *handle; /**< Provider-specific handle struct pointer.
+                               *   Typically assigned in provider's .init() */
+        } rk_sasl;
 };
 
 #define rd_kafka_wrlock(rk)    rwlock_wrlock(&(rk)->rk_lock)
